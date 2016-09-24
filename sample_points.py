@@ -34,7 +34,7 @@ N = 128
 buff = np.zeros((N, N), dtype="f8")
 for i, x in enumerate(np.linspace(x_min,x_max,N)):
     for j, y in enumerate(np.linspace(y_min,y_max,N)):
-        buff[i][j] = interpolate.interpolate2D(p1,p2,p3,np.array([x,y]),v1,v2,v3)
+        buff[i][j] = interpolate.interpolate2d(p1,p2,p3,np.array([x,y]),v1,v2,v3)
 
 
 import matplotlib
