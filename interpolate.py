@@ -21,10 +21,6 @@ def interpolate3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
     vol4 = (1./3)*(1./2)*ref_point[2]
     vol1 = tot_vol - vol2 - vol3 - vol4
 
-    lam1 = vol1/tot_vol
-    lam2 = vol2/tot_vol
-    lam3 = vol3/tot_vol
-    lam4 = vol4/tot_vol
     v_point = v1*(vol1/tot_vol) + v2*(vol2/tot_vol) + v3*(vol3/tot_vol) + v4*(vol4/tot_vol)
 
     mask = np.ones_like(v_point, dtype="bool")
@@ -50,12 +46,11 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
     area3 = 0.5*1*ref_point[1]
     area1 = tot_area - area2 - area3
 
-    lam1 = area1/tot_area
-    lam2 = area2/tot_area
-    lam3 = area3/tot_area
+    v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
 
-    if (0<lam1<1 and 0<lam2<1 and 0<lam3<1):
-        v_point = v1*lam1 + v2*lam2 + v3*lam3
-        return v_point
-    else:
-        return None
+    mask = np.ones_like(v_point, dtype="bool")
+    for a in [area1, area2, area3]:
+        mask *= (a/tot_area) > 0
+        mask *= (a/tot_area) < 1
+
+    return v_point, mask
