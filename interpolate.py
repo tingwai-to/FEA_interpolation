@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as npla
-
+from numba import jit
 
 def interpolate3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
     J = np.array([[p2[0]-p1[0], p3[0]-p1[0], p4[0]-p1[0]],
@@ -30,16 +30,16 @@ def interpolate3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
 
     return v_point, mask
 
-
+@jit
 def interpolate2d(p1, p2, p3, point, v1, v2, v3):
     trans = np.array([[ p2[0]-p1[0], p3[0]-p1[0] ],
                       [ p2[1]-p1[1], p3[1]-p1[1] ]])
     trans = npla.inv(trans)
 
-    # ref1 = trans.dot(np.array([ p1[0]-p1[0], p1[1]-p1[1] ]))
-    # ref2 = trans.dot(np.array([ p2[0]-p1[0], p2[1]-p1[1] ]))
-    # ref3 = trans.dot(np.array([ p3[0]-p1[0], p3[1]-p1[1] ]))
-    ref_point = trans.dot(np.array([ point[0]-p1[0], point[1]-p1[1] ]))
+    ref_point = np.empty_like(point)
+    for i in range(point.shape[0]):
+        for j in range(point.shape[1]):
+            ref_point[i][j] = trans[i,0]*(point[0,j]-p1[i]) + trans[i,1]*(point[1,j]-p1[i])
 
     tot_area = 0.5  # Area of 45-45-90 triangle, side length=1
     area2 = 0.5*1*ref_point[0]
