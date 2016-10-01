@@ -50,6 +50,7 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
 
     mask = np.ones_like(v_point, dtype="bool")
     for a in [area1, area2, area3]:
+        print a     # only works with print statement?
         mask *= (a/tot_area) > 0
         mask *= (a/tot_area) < 1
 
