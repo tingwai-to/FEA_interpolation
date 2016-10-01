@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 import numpy.linalg as npla
 from numba import jit
@@ -39,7 +40,7 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
     ref_point = np.empty_like(point)
     for i in range(point.shape[0]):
         for j in range(point.shape[1]):
-            ref_point[i][j] = trans[i,0]*(point[0,j]-p1[i]) + trans[i,1]*(point[1,j]-p1[i])
+            ref_point[i,j] = trans[i,0]*(point[0,j]-p1[i]) + trans[i,1]*(point[1,j]-p1[i])
 
     tot_area = 0.5  # Area of 45-45-90 triangle, side length=1
     area2 = 0.5*1*ref_point[0]
@@ -49,9 +50,13 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
     v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
 
     mask = np.ones_like(v_point, dtype="bool")
-    for a in [area1, area2, area3]:
-        print a     # only works with print statement?
-        mask *= (a/tot_area) > 0
-        mask *= (a/tot_area) < 1
+    for i in range(v_point.shape[0]):
+        if (area1[i]/tot_area) < 0 or \
+           (area1[i]/tot_area) > 1 or \
+           (area2[i]/tot_area) < 0 or \
+           (area2[i]/tot_area) > 1 or \
+           (area3[i]/tot_area) < 0 or \
+           (area3[i]/tot_area) > 1:
+            mask[i] = False
 
     return v_point, mask
