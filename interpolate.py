@@ -66,8 +66,26 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
             mask[i] = 0
     return v_point#, mask
 
-def get_fun_function(value):
-    @jit
-    def something(v):
-        return value * v
-    return something
+def interpolate2d_nojit(p1, p2, p3, point, v1, v2, v3):
+    trans = np.array([[ p2[0]-p1[0], p3[0]-p1[0] ],
+                      [ p2[1]-p1[1], p3[1]-p1[1] ]])
+    trans = npla.inv(trans)
+
+    # ref1 = trans.dot(np.array([ p1[0]-p1[0], p1[1]-p1[1] ]))
+    # ref2 = trans.dot(np.array([ p2[0]-p1[0], p2[1]-p1[1] ]))
+    # ref3 = trans.dot(np.array([ p3[0]-p1[0], p3[1]-p1[1] ]))
+    ref_point = trans.dot(np.array([ point[0]-p1[0], point[1]-p1[1] ]))
+
+    tot_area = 0.5  # Area of 45-45-90 triangle, side length=1
+    area2 = 0.5*1*ref_point[0]
+    area3 = 0.5*1*ref_point[1]
+    area1 = tot_area - area2 - area3
+
+    v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
+
+    mask = np.ones_like(v_point, dtype="bool")
+    for a in [area1, area2, area3]:
+        mask *= (a/tot_area) > 0
+        mask *= (a/tot_area) < 1
+
+    return v_point#, mask

@@ -30,7 +30,11 @@ for N in [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]:
     buff.shape = x.shape
     #mask.shape = x.shape
     t2 = time.time()
-    print "% 5i Took %0.3e" % (N, t2-t1)
+    buff = interpolate.interpolate2d_nojit(p1,p2,p3,
+            np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
+    t3 = time.time()
+    print "% 5i Took %0.3e for JIT versus %0.3e for no-JIT (%0.2f x)" % (N,
+            t2-t1, t3-t2, (t3-t2)/(t2-t1))
 
 buffer = np.ma.MaskedArray(buff, ~mask).transpose()
 
