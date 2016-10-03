@@ -2,6 +2,7 @@ from __future__ import print_function
 import numpy as np
 import numpy.linalg as npla
 from numba import jit
+import numba as nb
 
 def interpolate3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
     J = np.array([[p2[0]-p1[0], p3[0]-p1[0], p4[0]-p1[0]],
@@ -26,15 +27,20 @@ def interpolate3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
 
     mask = np.ones_like(v_point, dtype="bool")
     for v in [vol1, vol2, vol3, vol4]:
-        mask *= (v/tot_vol) > 0
-        mask *= (v/tot_vol) < 1
+        mask &= (v/tot_vol) > 0
+        mask &= (v/tot_vol) < 1
 
     return v_point, mask
 
-@jit
+@jit(nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:], nb.float64[:,:],
+    nb.float64, nb.float64, nb.float64),
+    nopython=True)
 def interpolate2d(p1, p2, p3, point, v1, v2, v3):
-    trans = np.array([[ p2[0]-p1[0], p3[0]-p1[0] ],
-                      [ p2[1]-p1[1], p3[1]-p1[1] ]])
+    trans = np.empty((2,2), dtype=nb.float64)
+    trans[0,0] = p2[0] - p1[0]
+    trans[0,1] = p3[0] - p1[0]
+    trans[1,0] = p2[1] - p1[1]
+    trans[1,1] = p3[1] - p1[1]
     trans = npla.inv(trans)
 
     ref_point = np.empty_like(point)
@@ -49,7 +55,7 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
 
     v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
 
-    mask = np.ones_like(v_point, dtype="bool")
+    mask = np.ones_like(v_point, dtype=nb.uint8)
     for i in range(v_point.shape[0]):
         if (area1[i]/tot_area) < 0 or \
            (area1[i]/tot_area) > 1 or \
@@ -57,6 +63,11 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
            (area2[i]/tot_area) > 1 or \
            (area3[i]/tot_area) < 0 or \
            (area3[i]/tot_area) > 1:
-            mask[i] = False
+            mask[i] = 0
+    return v_point#, mask
 
-    return v_point, mask
+def get_fun_function(value):
+    @jit
+    def something(v):
+        return value * v
+    return something

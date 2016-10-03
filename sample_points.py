@@ -1,3 +1,4 @@
+import time
 import os, sys
 import interpolate
 import numpy as np
@@ -6,9 +7,9 @@ import matplotlib.pyplot as plt
 matplotlib.use("agg")
 
 # 2D sample points
-p1 = np.array([2,2])
-p2 = np.array([4,3])
-p3 = np.array([1,4])
+p1 = np.array([2,2], dtype="f8")
+p2 = np.array([4,3], dtype="f8")
+p3 = np.array([1,4], dtype="f8")
 # p4 = np.array([2,2])  # Value to be interpolated
 v1 = 1
 v2 = 2
@@ -19,14 +20,17 @@ y_min = min(_[1] for _ in (p1, p2, p3))
 x_max = max(_[0] for _ in (p1, p2, p3))
 y_max = max(_[1] for _ in (p1, p2, p3))
 
-N = 128
-x, y = np.mgrid[x_min:x_max:1j*N,
-                y_min:y_max:1j*N]
-
-buff, mask = interpolate.interpolate2d(p1,p2,p3,
-        np.array([_.ravel() for _ in (x, y)]), v1, v2, v3)
-buff.shape = x.shape
-mask.shape = x.shape
+for N in [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]:
+    x, y = np.mgrid[x_min:x_max:1j*N,
+                    y_min:y_max:1j*N]
+    t1 = time.time()
+    #buff, mask = interpolate.interpolate2d(p1,p2,p3,
+    buff = interpolate.interpolate2d(p1,p2,p3,
+            np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
+    buff.shape = x.shape
+    #mask.shape = x.shape
+    t2 = time.time()
+    print "% 5i Took %0.3e" % (N, t2-t1)
 
 buffer = np.ma.MaskedArray(buff, ~mask).transpose()
 
@@ -73,7 +77,8 @@ x, y, z = np.mgrid[x_min:x_max:1j*N,
                    z_min:z_max:1j*N]
 
 buff, mask = interpolate.interpolate3d(p1,p2,p3,p4,
-        np.array([_.ravel() for _ in (x, y, z)]), v1, v2, v3, v4)
+        np.array([_.ravel() for _ in (x, y, z)], dtype="f8"),
+        v1, v2, v3, v4)
 buff.shape = x.shape
 mask.shape = x.shape
 
