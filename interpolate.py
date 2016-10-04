@@ -36,6 +36,7 @@ def interpolate3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
     nb.float64, nb.float64, nb.float64),
     nopython=True)
 def interpolate2d(p1, p2, p3, point, v1, v2, v3):
+    # Transformation matrix to reference element
     trans = np.empty((2,2), dtype=nb.float64)
     trans[0,0] = p2[0] - p1[0]
     trans[0,1] = p3[0] - p1[0]
@@ -43,6 +44,7 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
     trans[1,1] = p3[1] - p1[1]
     trans = npla.inv(trans)
 
+    # Transform all points to new space
     ref_point = np.empty_like(point)
     for i in range(point.shape[0]):
         for j in range(point.shape[1]):
@@ -53,8 +55,10 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
     area3 = 0.5*1*ref_point[1]
     area1 = tot_area - area2 - area3
 
+    # Linear interpolated value of point
     v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
 
+    # Check if point is within bounds of original element
     mask = np.ones_like(v_point, dtype=nb.uint8)
     for i in range(v_point.shape[0]):
         if (area1[i]/tot_area) < 0 or \
@@ -71,9 +75,6 @@ def interpolate2d_nojit(p1, p2, p3, point, v1, v2, v3):
                       [ p2[1]-p1[1], p3[1]-p1[1] ]])
     trans = npla.inv(trans)
 
-    # ref1 = trans.dot(np.array([ p1[0]-p1[0], p1[1]-p1[1] ]))
-    # ref2 = trans.dot(np.array([ p2[0]-p1[0], p2[1]-p1[1] ]))
-    # ref3 = trans.dot(np.array([ p3[0]-p1[0], p3[1]-p1[1] ]))
     ref_point = trans.dot(np.array([ point[0]-p1[0], point[1]-p1[1] ]))
 
     tot_area = 0.5  # Area of 45-45-90 triangle, side length=1
