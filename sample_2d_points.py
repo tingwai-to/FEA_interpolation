@@ -28,6 +28,7 @@ fig, ax = plt.subplots()
 for N in [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]:
     x, y = np.mgrid[x_min:x_max:1j*N,
                     y_min:y_max:1j*N]
+
     start = time.time()
     buff = interpolate.interpolate2d_f64(p1,p2,p3,
             np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
@@ -41,17 +42,27 @@ for N in [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]:
     ax.scatter(N, end-start, c='r', s=50)
 
     start = time.time()
-    buff = interpolate.interpolate2d_nojit(p1,p2,p3,
+    buff = interpolate.interpolate2d_nojit64(p1,p2,p3,
             np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
     end = time.time()
     ax.scatter (N, end-start, c='b', s=50)
+
+    start = time.time()
+    buff = interpolate.interpolate2d_nojit32(p1.astype(np.float32), p2.astype(np.float32), p3.astype(np.float32),
+            np.array([_.ravel() for _ in (x, y)], dtype="f"), v1, v2, v3)
+    end = time.time()
+    ax.scatter (N, end-start, c='y', s=50)
+
 
 ax.set_xscale('log', basex=2)
 ax.set_yscale('log', basey=10)
 f64_patch = mpatches.Patch(color='green', label='float64')
 f32_patch = mpatches.Patch(color='red', label='float32')
-nojit_patch = mpatches.Patch(color='blue', label='nojit64')
-plt.legend(handles=[f64_patch, f32_patch, nojit_patch], loc=2)
+nojit64_patch = mpatches.Patch(color='blue', label='nojit64')
+nojit32_patch = mpatches.Patch(color='yellow', label='nojit32')
+plt.legend(handles=[f64_patch, f32_patch, nojit64_patch, nojit32_patch], loc=2)
+plt.xlabel('N')
+plt.ylabel('Time [s]')
 plt.savefig("2d_speed_comparison.png")
 
 # buffer = np.ma.MaskedArray(buff, ~mask).transpose()

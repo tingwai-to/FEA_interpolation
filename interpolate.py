@@ -91,14 +91,14 @@ def interpolate2d_f32(p1, p2, p3, point, v1, v2, v3):
     tot_area = np.array([0.5], dtype=np.float32)  # Area of 45-45-90 triangle, side length=1
     area2 = np.array([0.5*1], dtype=np.float32)*ref_point[0]
     area3 = np.array([0.5*1], dtype=np.float32)*ref_point[1]
-    area1 = (tot_area - area2 - area3)
+    area1 = tot_area - area2 - area3
 
     # Linear interpolated value of point
     v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
 
     return v_point
 
-def interpolate2d_nojit(p1, p2, p3, point, v1, v2, v3):
+def interpolate2d_nojit64(p1, p2, p3, point, v1, v2, v3):
     trans = np.array([[ p2[0]-p1[0], p3[0]-p1[0] ],
                       [ p2[1]-p1[1], p3[1]-p1[1] ]])
     trans = npla.inv(trans)
@@ -108,6 +108,27 @@ def interpolate2d_nojit(p1, p2, p3, point, v1, v2, v3):
     tot_area = 0.5  # Area of 45-45-90 triangle, side length=1
     area2 = 0.5*1*ref_point[0]
     area3 = 0.5*1*ref_point[1]
+    area1 = tot_area - area2 - area3
+
+    v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
+
+    mask = np.ones_like(v_point, dtype="bool")
+    for a in [area1, area2, area3]:
+        mask *= (a/tot_area) > 0
+        mask *= (a/tot_area) < 1
+
+    return v_point#, mask
+
+def interpolate2d_nojit32(p1, p2, p3, point, v1, v2, v3):
+    trans = np.array([[ p2[0]-p1[0], p3[0]-p1[0] ],
+                      [ p2[1]-p1[1], p3[1]-p1[1] ]], dtype=np.float32)
+    trans = npla.inv(trans)
+
+    ref_point = trans.dot(np.array([ point[0]-p1[0], point[1]-p1[1] ], dtype=np.float32))
+
+    tot_area = np.array([0.5], dtype=np.float32)
+    area2 = np.array([0.5*1], dtype=np.float32)*ref_point[0]
+    area3 = np.array([0.5*1], dtype=np.float32)*ref_point[1]
     area1 = tot_area - area2 - area3
 
     v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
