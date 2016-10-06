@@ -3,9 +3,10 @@ import os
 import sys
 import interpolate
 import numpy as np
-import matplotlib
+# import matplotlib
 import matplotlib.pyplot as plt
-matplotlib.use("agg")
+import matplotlib.patches as mpatches
+# matplotlib.use("agg")
 
 # 2D sample points
 p1 = np.array([2,2], dtype="f8")
@@ -21,23 +22,37 @@ y_min = min(_[1] for _ in (p1, p2, p3))
 x_max = max(_[0] for _ in (p1, p2, p3))
 y_max = max(_[1] for _ in (p1, p2, p3))
 
+
+fig, ax = plt.subplots()
+
 for N in [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]:
     x, y = np.mgrid[x_min:x_max:1j*N,
                     y_min:y_max:1j*N]
-    t1 = time.time()
-    #buff, mask = interpolate.interpolate2d(p1,p2,p3,
-    buff = interpolate.interpolate2d(p1,p2,p3,
+    start = time.time()
+    buff = interpolate.interpolate2d_f64(p1,p2,p3,
             np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
-    buff.shape = x.shape
-    #mask.shape = x.shape
-    t2 = time.time()
+    end = time.time()
+    ax.scatter(N, end-start, c='g', s=50)
+
+    start = time.time()
+    buff = interpolate.interpolate2d_f32(p1.astype(np.float32), p2.astype(np.float32), p3.astype(np.float32),
+            np.array([_.ravel() for _ in (x, y)], dtype="f"), v1, v2, v3)
+    end = time.time()
+    ax.scatter(N, end-start, c='r', s=50)
+
+    start = time.time()
     buff = interpolate.interpolate2d_nojit(p1,p2,p3,
             np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
-    t3 = time.time()
+    end = time.time()
+    ax.scatter (N, end-start, c='b', s=50)
 
-    print ("% 5i Took %0.3e for JIT versus %0.3e for no-JIT (%0.2f x)" % (N,
-            t2-t1, t3-t2, (t3-t2)/(t2-t1)))
-
+ax.set_xscale('log', basex=2)
+ax.set_yscale('log', basey=10)
+f64_patch = mpatches.Patch(color='green', label='float64')
+f32_patch = mpatches.Patch(color='red', label='float32')
+nojit_patch = mpatches.Patch(color='blue', label='nojit64')
+plt.legend(handles=[f64_patch, f32_patch, nojit_patch], loc=2)
+plt.savefig("2d_speed_comparison.png")
 
 # buffer = np.ma.MaskedArray(buff, ~mask).transpose()
 # plt.clf()

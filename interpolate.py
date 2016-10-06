@@ -35,7 +35,7 @@ def interpolate3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
 @jit(nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:], nb.float64[:,:],
     nb.float64, nb.float64, nb.float64),
     nopython=True)
-def interpolate2d(p1, p2, p3, point, v1, v2, v3):
+def interpolate2d_f64(p1, p2, p3, point, v1, v2, v3):
     # Transformation matrix to reference element
     trans = np.empty((2,2), dtype=nb.float64)
     trans[0,0] = p2[0] - p1[0]
@@ -69,6 +69,34 @@ def interpolate2d(p1, p2, p3, point, v1, v2, v3):
            (area3[i]/tot_area) > 1:
             mask[i] = 0
     return v_point#, mask
+
+@jit(nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:], nb.float32[:,:],
+    nb.float32, nb.float32, nb.float32),
+    nopython=True)
+def interpolate2d_f32(p1, p2, p3, point, v1, v2, v3):
+    # Transformation matrix to reference element
+    trans = np.empty((2,2), dtype=nb.float32)
+    trans[0,0] = p2[0] - p1[0]
+    trans[0,1] = p3[0] - p1[0]
+    trans[1,0] = p2[1] - p1[1]
+    trans[1,1] = p3[1] - p1[1]
+    trans = npla.inv(trans)
+
+    # Transform all points to new space
+    ref_point = np.empty_like(point, dtype=np.float32)
+    for i in range(point.shape[0]):
+        for j in range(point.shape[1]):
+            ref_point[i,j] = trans[i,0]*(point[0,j]-p1[i]) + trans[i,1]*(point[1,j]-p1[i])
+
+    tot_area = np.array([0.5], dtype=np.float32)  # Area of 45-45-90 triangle, side length=1
+    area2 = np.array([0.5*1], dtype=np.float32)*ref_point[0]
+    area3 = np.array([0.5*1], dtype=np.float32)*ref_point[1]
+    area1 = (tot_area - area2 - area3)
+
+    # Linear interpolated value of point
+    v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
+
+    return v_point
 
 def interpolate2d_nojit(p1, p2, p3, point, v1, v2, v3):
     trans = np.array([[ p2[0]-p1[0], p3[0]-p1[0] ],
