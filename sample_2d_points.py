@@ -24,8 +24,13 @@ y_max = max(_[1] for _ in (p1, p2, p3))
 
 
 fig, ax = plt.subplots()
+jit64 = []
+jit32 = []
+nojit32 = []
+nojit64 = []
+Ns = np.array([8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192])
 
-for N in [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]:
+for N in Ns:
     x, y = np.mgrid[x_min:x_max:1j*N,
                     y_min:y_max:1j*N]
 
@@ -33,40 +38,56 @@ for N in [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]:
     buff = interpolate.interpolate2d_f64(p1,p2,p3,
             np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
     end = time.time()
-    ax.scatter(N, end-start, c='g', s=50)
+    jit64.append(end-start)
 
     start = time.time()
     buff = interpolate.interpolate2d_f32(p1.astype(np.float32), p2.astype(np.float32), p3.astype(np.float32),
             np.array([_.ravel() for _ in (x, y)], dtype="f"), v1, v2, v3)
     end = time.time()
-    ax.scatter(N, end-start, c='r', s=50)
+    jit32.append(end-start)
 
     start = time.time()
     buff = interpolate.interpolate2d_nojit64(p1,p2,p3,
             np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
     end = time.time()
-    ax.scatter (N, end-start, c='b', s=50)
+    nojit64.append(end-start)
 
     start = time.time()
     buff = interpolate.interpolate2d_nojit32(p1.astype(np.float32), p2.astype(np.float32), p3.astype(np.float32),
             np.array([_.ravel() for _ in (x, y)], dtype="f"), v1, v2, v3)
     end = time.time()
-    ax.scatter (N, end-start, c='y', s=50)
+    nojit32.append(end-start)
 
-
+ax.loglog(Ns, jit64, '-og', label='JIT-64')
+ax.loglog(Ns, jit32, '-or', label='JIT-32')
+ax.loglog(Ns, nojit64, '-ob', label='NOJIT-64')
+ax.loglog(Ns, nojit32, '-oy', label='NOJIT-32')
 ax.set_xscale('log', basex=2)
 ax.set_yscale('log', basey=10)
-f64_patch = mpatches.Patch(color='green', label='float64')
-f32_patch = mpatches.Patch(color='red', label='float32')
-nojit64_patch = mpatches.Patch(color='blue', label='nojit64')
-nojit32_patch = mpatches.Patch(color='yellow', label='nojit32')
-plt.legend(handles=[f64_patch, f32_patch, nojit64_patch, nojit32_patch], loc=2)
+plt.legend(loc=2)
 plt.xlabel('N')
 plt.ylabel('Time [s]')
 plt.savefig("2d_speed_comparison.png")
 
-# buffer = np.ma.MaskedArray(buff, ~mask).transpose()
-# plt.clf()
-# plt.imshow(buffer, origin='lower', interpolation='nearest')
-# plt.colorbar()
-# plt.savefig("output2d.png")
+jit64 = np.array(jit64)
+jit32 = np.array(jit32)
+nojit32 = np.array(nojit32)
+nojit64 = np.array(nojit64)
+
+rel_jit64 = (jit64 / (Ns*Ns))
+rel_jit32 = (jit32 / (Ns*Ns))
+rel_nojit64 = (nojit64 / (Ns*Ns))
+rel_nojit32 = (nojit32 / (Ns*Ns))
+
+plt.clf()
+ax = plt.gca()
+ax.loglog(Ns, rel_jit64, '-og', label='JIT-64')
+ax.loglog(Ns, rel_jit32, '-or', label='JIT-32')
+ax.loglog(Ns, rel_nojit64, '-ob', label='NOJIT-64')
+ax.loglog(Ns, rel_nojit32, '-oy', label='NOJIT-32')
+ax.set_xscale('log', basex=2)
+ax.set_yscale('log', basey=10)
+plt.legend(loc=2)
+plt.xlabel('N')
+plt.ylabel('Time per Element')
+plt.savefig("2d_speed_comparison_rel.png")
