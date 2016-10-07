@@ -3,16 +3,12 @@ import os
 import sys
 import interpolate
 import numpy as np
-# import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-# matplotlib.use("agg")
 
 # 2D sample points
 p1 = np.array([2,2], dtype="f8")
 p2 = np.array([4,3], dtype="f8")
 p3 = np.array([1,4], dtype="f8")
-# p4 = np.array([2,2])  # Value to be interpolated
 v1 = 1
 v2 = 2
 v3 = 3
@@ -28,35 +24,36 @@ jit64 = []
 jit32 = []
 nojit32 = []
 nojit64 = []
-Ns = np.array([8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192])
+Ns = np.array([8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096])
 
 for N in Ns:
     x, y = np.mgrid[x_min:x_max:1j*N,
                     y_min:y_max:1j*N]
 
     start = time.time()
-    buff = interpolate.interpolate2d_f64(p1,p2,p3,
+    buff = interpolate.linear_2d_f64(p1,p2,p3,
             np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
     end = time.time()
     jit64.append(end-start)
 
     start = time.time()
-    buff = interpolate.interpolate2d_f32(p1.astype(np.float32), p2.astype(np.float32), p3.astype(np.float32),
+    buff = interpolate.linear_2d_f32(p1.astype(np.float32), p2.astype(np.float32), p3.astype(np.float32),
             np.array([_.ravel() for _ in (x, y)], dtype="f"), v1, v2, v3)
     end = time.time()
     jit32.append(end-start)
 
     start = time.time()
-    buff = interpolate.interpolate2d_nojit64(p1,p2,p3,
+    buff = interpolate.linear_2d_nojit64(p1,p2,p3,
             np.array([_.ravel() for _ in (x, y)], dtype="f8"), v1, v2, v3)
     end = time.time()
     nojit64.append(end-start)
 
     start = time.time()
-    buff = interpolate.interpolate2d_nojit32(p1.astype(np.float32), p2.astype(np.float32), p3.astype(np.float32),
+    buff = interpolate.linear_2d_nojit32(p1.astype(np.float32), p2.astype(np.float32), p3.astype(np.float32),
             np.array([_.ravel() for _ in (x, y)], dtype="f"), v1, v2, v3)
     end = time.time()
     nojit32.append(end-start)
+
 
 ax.loglog(Ns, jit64, '-og', label='JIT-64')
 ax.loglog(Ns, jit32, '-or', label='JIT-32')
@@ -68,6 +65,7 @@ plt.legend(loc=2)
 plt.xlabel('N')
 plt.ylabel('Time [s]')
 plt.savefig("2d_speed_comparison.png")
+
 
 jit64 = np.array(jit64)
 jit32 = np.array(jit32)
