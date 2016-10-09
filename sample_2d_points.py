@@ -2,13 +2,14 @@ import time
 import os
 import sys
 import interpolate
+import idw
 import numpy as np
 import matplotlib.pyplot as plt
 
 # 2D sample points
-p1 = np.array([2,2], dtype="f8")
-p2 = np.array([4,3], dtype="f8")
-p3 = np.array([1,4], dtype="f8")
+p1 = np.array([2,2], dtype='f8')
+p2 = np.array([4,3], dtype='f8')
+p3 = np.array([1,4], dtype='f8')
 v1 = 1.
 v2 = 2.
 v3 = 3.
@@ -24,22 +25,22 @@ N=128
 x, y = np.mgrid[x_min:x_max:1j*N,
                 y_min:y_max:1j*N]
 
-points_f64 = np.array([_.ravel() for _ in (x, y)], dtype="f8")
-points_f32 = np.array([_.ravel() for _ in (x, y)], dtype="f")
+points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
+points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
 
-start = time.time()
-buff = interpolate.idw(p1, p2, p3, points_f64, v1, v2, v3, 128)
-end = time.time()
-
+power = 128
+buff = idw.simple(p1, p2, p3, points_f64, v1, v2, v3, power)
 buff.shape = x.shape
-plt.imshow(buff.T, extent=[x_min, x_max, y_min, y_max], origin='lower')
+
+
+plt.imshow(buff.T, extent=[x_min, x_max, y_min, y_max], origin='lower',
+           interpolation='nearest')
 plt.plot([p1[0], p2[0], p3[0], p1[0]], [p1[1], p2[1], p3[1], p1[1]], '-k')
 plt.colorbar()
-plt.show()
+plt.savefig('idw_2d.png')
 
 
-sys.exit()
-
+# Linear interpolation, JIT & non-JIT
 fig, ax = plt.subplots()
 jit64 = []
 jit32 = []
@@ -51,8 +52,8 @@ for N in Ns:
     x, y = np.mgrid[x_min:x_max:1j*N,
                     y_min:y_max:1j*N]
 
-    points_f64 = np.array([_.ravel() for _ in (x, y)], dtype="f8")
-    points_f32 = np.array([_.ravel() for _ in (x, y)], dtype="f")
+    points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
+    points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
 
     start = time.time()
     buff = interpolate.linear_2d_f64(p1, p2, p3, points_f64,

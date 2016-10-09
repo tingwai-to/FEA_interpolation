@@ -1,30 +1,16 @@
 from __future__ import print_function
 import numpy as np
 import numpy.linalg as npla
-from numpy import sqrt
 from numba import jit
 import numba as nb
 
-
-def idw(p1, p2, p3, point, v1, v2, v3, power):
-    """Inverse distance weighting"""
-    def distance(xn, x):
-        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
-    def weight(xn, x, p):
-        return 1 / distance(xn,x)**p
-
-    v_point = (v1*weight(p1, point, power) +
-               v2*weight(p2, point, power) +
-               v3*weight(p3, point, power)) / \
-              (weight(p1, point, power) + weight(p2, point, power) + weight(p3, point, power))
-    return v_point
 
 def make_3d_jit(dtype):
     @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:], dtype[:,:],
          dtype, dtype, dtype, dtype),
          nopython=True)
     def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
-        """Linear interpolation for 3D element"""
+        """JIT optimized linear interpolation for 3D element"""
         # Transformation matrix to reference element
         trans = np.empty((3,3), dtype=dtype)
         trans[0,0] = p2[0]-p1[0]
@@ -63,8 +49,8 @@ def make_3d_jit(dtype):
                vol3/(1./6) > 1:
                 v_point[j] = -1
             else:
-                v_point[j] = v1 * (vol1/(1./6)) + v2*(vol2/(1./6)) + \
-                             v3 * (vol3/(1./6)) + v4*(vol4/(1./6))
+                v_point[j] = v1*(vol1/(1./6)) + v2*(vol2/(1./6)) + \
+                             v3*(vol3/(1./6)) + v4*(vol4/(1./6))
 
         # mask = np.ones_like(v_point, dtype=nb.uint8)
         # for v in [vol1, vol2, vol3, vol4]:
@@ -77,6 +63,7 @@ def make_3d_jit(dtype):
 
 def make_3d_nojit(dtype):
     def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
+        """Non-JIT linear interpolation for 3D element"""
         trans = np.array([[p2[0]-p1[0], p3[0]-p1[0], p4[0]-p1[0]],
                           [p2[1]-p1[1], p3[1]-p1[1], p4[1]-p1[1]],
                           [p2[2]-p1[2], p3[2]-p1[2], p4[2]-p1[2]]], dtype=dtype)
@@ -110,7 +97,7 @@ def make_2d_jit(dtype):
          dtype, dtype, dtype),
          nopython=True)
     def linear_2d(p1, p2, p3, point, v1, v2, v3):
-        """Linear interpolation for 2D element"""
+        """JIT optimized linear interpolation for 2D element"""
         # Transformation matrix to reference element
         trans = np.empty((2,2), dtype=dtype)
         trans[0,0] = p2[0] - p1[0]
@@ -122,8 +109,10 @@ def make_2d_jit(dtype):
         v_point = np.empty(point.shape[1], dtype=dtype)
         for j in range(point.shape[1]):
             # Transform points to new space
-            ref_point_x = trans[0,0]*(point[0,j]-p1[0]) + trans[0,1]*(point[1,j]-p1[0])
-            ref_point_y = trans[1,0]*(point[0,j]-p1[1]) + trans[1,1]*(point[1,j]-p1[1])
+            ref_point_x = trans[0,0]*(point[0,j]-p1[0]) + \
+                          trans[0,1]*(point[1,j]-p1[0])
+            ref_point_y = trans[1,0]*(point[0,j]-p1[1]) + \
+                          trans[1,1]*(point[1,j]-p1[1])
             area2 = 0.5*ref_point_x
             area3 = 0.5*ref_point_y
             area1 = 0.5 - area2 - area3
@@ -144,11 +133,12 @@ def make_2d_jit(dtype):
 
 def make_2d_nojit(dtype):
     def linear_2d(p1, p2, p3, point, v1, v2, v3):
-        trans = np.array([[ p2[0]-p1[0], p3[0]-p1[0] ],
-                          [ p2[1]-p1[1], p3[1]-p1[1] ]], dtype=dtype)
+        """Non-JIT linear interpolation for 2D element"""
+        trans = np.array([[p2[0]-p1[0], p3[0]-p1[0]],
+                          [p2[1]-p1[1], p3[1]-p1[1]]], dtype=dtype)
         trans = npla.inv(trans)
 
-        ref_point = trans.dot(np.array([ point[0]-p1[0], point[1]-p1[1] ], dtype=dtype))
+        ref_point = trans.dot(np.array([point[0]-p1[0], point[1]-p1[1]], dtype=dtype))
 
         tot_area = np.array([0.5], dtype=dtype)
         area2 = np.array([0.5*1], dtype=dtype)*ref_point[0]
