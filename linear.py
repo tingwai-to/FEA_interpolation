@@ -131,35 +131,11 @@ def make_2d_jit(dtype):
     return linear_2d
 
 
-def make_2d_nojit(dtype):
-    def linear_2d(p1, p2, p3, point, v1, v2, v3):
-        """Non-JIT linear interpolation for 2D element"""
-        trans = np.array([[p2[0]-p1[0], p3[0]-p1[0]],
-                          [p2[1]-p1[1], p3[1]-p1[1]]], dtype=dtype)
-        trans = npla.inv(trans)
 
-        ref_point = trans.dot(np.array([point[0]-p1[0], point[1]-p1[1]], dtype=dtype))
-
-        tot_area = np.array([0.5], dtype=dtype)
-        area2 = np.array([0.5*1], dtype=dtype)*ref_point[0]
-        area3 = np.array([0.5*1], dtype=dtype)*ref_point[1]
-        area1 = tot_area - area2 - area3
-
-        v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
-
-        # mask = np.ones_like(v_point, dtype="bool")
-        # for a in [area1, area2, area3]:
-        #     mask *= (a/tot_area) > 0
-        #     mask *= (a/tot_area) < 1
-
-        return v_point#, mask
-    return linear_2d
 
 
 linear_2d_f64 = make_2d_jit(nb.float64)
 linear_2d_f32 = make_2d_jit(nb.float32)
-linear_2d_nojit64 = make_2d_nojit(np.float64)
-linear_2d_nojit32 = make_2d_nojit(np.float32)
 
 linear_3d_f64 = make_3d_jit(nb.float64)
 linear_3d_f32 = make_3d_jit(nb.float32)
