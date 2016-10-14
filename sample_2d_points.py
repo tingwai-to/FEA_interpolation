@@ -29,7 +29,7 @@ points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
 points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
 
 power = 128
-buff = idw.simple(p1, p2, p3, points_f64, v1, v2, v3, power)
+buff = idw.idw_2d_f64(p1, p2, p3, points_f64, v1, v2, v3, power)
 buff.shape = x.shape
 
 
@@ -74,16 +74,16 @@ for N in Ns:
     idw32.append(end-start)
 
     start = time.time()
-    idw.simple_nojit(p1, p2, p3, points_f64, v1, v2, v3, 2)
+    idw.simple_2d_nojit(p1, p2, p3, points_f64, v1, v2, v3, 2)
     end = time.time()
     nojitidw64.append(end-start)
 
     start = time.time()
-    idw.simple_nojit(p1.astype(np.float32),
-                     p2.astype(np.float32),
-                     p3.astype(np.float32),
-                     points_f32,
-                     v1, v2, v3, 2)
+    idw.simple_2d_nojit(p1.astype(np.float32),
+                        p2.astype(np.float32),
+                        p3.astype(np.float32),
+                        points_f32,
+                        v1, v2, v3, 2)
     end = time.time()
     nojitidw32.append(end-start)
 
@@ -139,8 +139,8 @@ jit32 = np.array(jit32)
 nojit32 = np.array(nojit32)
 nojit64 = np.array(nojit64)
 idw64 = np.array(idw64)
-nojitidw64 = np.array(nojitidw64)
 idw32 = np.array(idw32)
+nojitidw64 = np.array(nojitidw64)
 nojitidw32 = np.array(nojitidw32)
 
 rel_jit64 = (jit64 / (Ns*Ns))
@@ -148,8 +148,8 @@ rel_jit32 = (jit32 / (Ns*Ns))
 rel_nojit64 = (nojit64 / (Ns*Ns))
 rel_nojit32 = (nojit32 / (Ns*Ns))
 rel_idw64 = (idw64 / (Ns*Ns))
-rel_nojitidw64 = (nojitidw64 / (Ns*Ns))
 rel_idw32 = (idw32 / (Ns*Ns))
+rel_nojitidw64 = (nojitidw64 / (Ns*Ns))
 rel_nojitidw32 = (nojitidw32 / (Ns*Ns))
 
 plt.clf()
