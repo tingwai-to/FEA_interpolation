@@ -1,7 +1,7 @@
 import time
 import os
 import sys
-import interpolate
+import linear
 import idw
 import numpy as np
 import matplotlib.pyplot as plt
@@ -88,32 +88,32 @@ for N in Ns:
     nojitidw32.append(end-start)
 
     start = time.time()
-    interpolate.linear_2d_f64(p1, p2, p3, points_f64,
-                              v1, v2, v3)
+    linear.linear_2d_f64(p1, p2, p3, points_f64,
+                         v1, v2, v3)
     end = time.time()
     jit64.append(end-start)
 
     start = time.time()
-    interpolate.linear_2d_f32(p1.astype(np.float32),
-                              p2.astype(np.float32),
-                              p3.astype(np.float32),
-                              points_f32,
-                              v1, v2, v3)
+    linear.linear_2d_f32(p1.astype(np.float32),
+                         p2.astype(np.float32),
+                         p3.astype(np.float32),
+                         points_f32,
+                         v1, v2, v3)
     end = time.time()
     jit32.append(end-start)
 
     start = time.time()
-    interpolate.linear_2d_nojit64(p1, p2, p3, points_f64,
-                                  v1, v2, v3)
+    linear.linear_2d_nojit64(p1, p2, p3, points_f64,
+                             v1, v2, v3)
     end = time.time()
     nojit64.append(end-start)
 
     start = time.time()
-    interpolate.linear_2d_nojit32(p1.astype(np.float32),
-                                  p2.astype(np.float32),
-                                  p3.astype(np.float32),
-                                  points_f32,
-                                  v1, v2, v3)
+    linear.linear_2d_nojit32(p1.astype(np.float32),
+                             p2.astype(np.float32),
+                             p3.astype(np.float32),
+                             points_f32,
+                             v1, v2, v3)
     end = time.time()
     nojit32.append(end-start)
 
