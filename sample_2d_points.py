@@ -47,7 +47,9 @@ jit32 = []
 nojit32 = []
 nojit64 = []
 idw64 = []
+idw32 = []
 nojitidw64 = []
+nojitidw32 = []
 Ns = np.array([8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096])
 
 for N in Ns:
@@ -58,42 +60,60 @@ for N in Ns:
     points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
 
     start = time.time()
-    buff = idw.simple(p1, p2, p3, points_f64, v1, v2, v3, 2)
+    idw.idw_2d_f64(p1, p2, p3, points_f64, v1, v2, v3, 2)
     end = time.time()
     idw64.append(end-start)
 
     start = time.time()
-    buff = idw.simple_nojit(p1, p2, p3, points_f64, v1, v2, v3, 2)
+    idw.idw_2d_f32(p1.astype(np.float32),
+                   p2.astype(np.float32),
+                   p3.astype(np.float32),
+                   points_f32,
+                   v1, v2, v3, 2)
+    end = time.time()
+    idw32.append(end-start)
+
+    start = time.time()
+    idw.simple_nojit(p1, p2, p3, points_f64, v1, v2, v3, 2)
     end = time.time()
     nojitidw64.append(end-start)
 
     start = time.time()
-    buff = interpolate.linear_2d_f64(p1, p2, p3, points_f64,
-                                     v1, v2, v3)
+    idw.simple_nojit(p1.astype(np.float32),
+                     p2.astype(np.float32),
+                     p3.astype(np.float32),
+                     points_f32,
+                     v1, v2, v3, 2)
+    end = time.time()
+    nojitidw32.append(end-start)
+
+    start = time.time()
+    interpolate.linear_2d_f64(p1, p2, p3, points_f64,
+                              v1, v2, v3)
     end = time.time()
     jit64.append(end-start)
 
     start = time.time()
-    buff = interpolate.linear_2d_f32(p1.astype(np.float32),
-                                     p2.astype(np.float32),
-                                     p3.astype(np.float32),
-                                     points_f32,
-                                     v1, v2, v3)
+    interpolate.linear_2d_f32(p1.astype(np.float32),
+                              p2.astype(np.float32),
+                              p3.astype(np.float32),
+                              points_f32,
+                              v1, v2, v3)
     end = time.time()
     jit32.append(end-start)
 
     start = time.time()
-    buff = interpolate.linear_2d_nojit64(p1, p2, p3, points_f64,
-                                         v1, v2, v3)
+    interpolate.linear_2d_nojit64(p1, p2, p3, points_f64,
+                                  v1, v2, v3)
     end = time.time()
     nojit64.append(end-start)
 
     start = time.time()
-    buff = interpolate.linear_2d_nojit32(p1.astype(np.float32),
-                                         p2.astype(np.float32),
-                                         p3.astype(np.float32),
-                                         points_f32,
-                                         v1, v2, v3)
+    interpolate.linear_2d_nojit32(p1.astype(np.float32),
+                                  p2.astype(np.float32),
+                                  p3.astype(np.float32),
+                                  points_f32,
+                                  v1, v2, v3)
     end = time.time()
     nojit32.append(end-start)
 
@@ -103,7 +123,9 @@ ax.loglog(Ns, jit32, '-or', label='JIT-32')
 ax.loglog(Ns, nojit64, '-ob', label='NOJIT-64')
 ax.loglog(Ns, nojit32, '-oy', label='NOJIT-32')
 ax.loglog(Ns, idw64, '-om', label='IDW-64')
+ax.loglog(Ns, idw32, '-o', color='#A9A9A9', label='IDW-32')
 ax.loglog(Ns, nojitidw64, '-ok', label='NOJIT-IDW-64')
+ax.loglog(Ns, nojitidw32, '-oc', label='NOJIT-IDW-32')
 ax.set_xscale('log', basex=2)
 ax.set_yscale('log', basey=10)
 plt.legend(loc=2)
@@ -118,6 +140,8 @@ nojit32 = np.array(nojit32)
 nojit64 = np.array(nojit64)
 idw64 = np.array(idw64)
 nojitidw64 = np.array(nojitidw64)
+idw32 = np.array(idw32)
+nojitidw32 = np.array(nojitidw32)
 
 rel_jit64 = (jit64 / (Ns*Ns))
 rel_jit32 = (jit32 / (Ns*Ns))
@@ -125,6 +149,8 @@ rel_nojit64 = (nojit64 / (Ns*Ns))
 rel_nojit32 = (nojit32 / (Ns*Ns))
 rel_idw64 = (idw64 / (Ns*Ns))
 rel_nojitidw64 = (nojitidw64 / (Ns*Ns))
+rel_idw32 = (idw32 / (Ns*Ns))
+rel_nojitidw32 = (nojitidw32 / (Ns*Ns))
 
 plt.clf()
 ax = plt.gca()
@@ -133,7 +159,9 @@ ax.loglog(Ns, rel_jit32, '-or', label='JIT-32')
 ax.loglog(Ns, rel_nojit64, '-ob', label='NOJIT-64')
 ax.loglog(Ns, rel_nojit32, '-oy', label='NOJIT-32')
 ax.loglog(Ns, rel_idw64, '-om', label='IDW-64')
+ax.loglog(Ns, rel_idw32, '-o', color='#A9A9A9', label='IDW-32')
 ax.loglog(Ns, rel_nojitidw64, '-ok', label='NOJIT-IDW-64')
+ax.loglog(Ns, rel_nojitidw32, '-oc', label='NOJIT-IDW-32')
 ax.set_xscale('log', basex=2)
 ax.set_yscale('log', basey=10)
 plt.legend(loc=1)
