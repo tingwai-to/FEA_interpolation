@@ -1,30 +1,28 @@
 from __future__ import print_function
-import idw
 import numpy as np
 import numpy.linalg as npla
 from numpy import sqrt
 
 
 class Element2D(object):
-    def __init__(self, p1, p2, p3, v1, v2, v3):
-        # TODO: __init__ should accept nodes, where node = [p1, v1]
-        self.p1 = p1
-        self.p2 = p2
-        self.p3 = p3
-        self.v1 = v1
-        self.v2 = v2
-        self.v3 = v3
+    def __init__(self, node1, node2, node3):
+        self.p1 = node1.coord
+        self.p2 = node2.coord
+        self.p3 = node3.coord
+        self.v1 = node1.value
+        self.v2 = node2.value
+        self.v3 = node3.value
 
-    def sample(self, method, dtype, point, **kwargs):
-        if method == 'linear':
-            return self.linear_nojit(dtype, point)
-        elif method == 'idw':
-            if 'power' in kwargs:
-                return self.idw_nojit(dtype, point, kwargs['power'])
-            else:
-                raise ValueError('missing IDW argument: power')
-        else:
-            raise AttributeError('no interpolation function called ' + method)
+    # def sample(self, method, dtype, point, **kwargs):
+    #     if method == 'linear':
+    #         return self.linear_nojit(dtype, point)
+    #     elif method == 'idw':
+    #         if 'power' in kwargs:
+    #             return self.idw_nojit(dtype, point, kwargs['power'])
+    #         else:
+    #             raise ValueError('missing IDW argument: power')
+    #     else:
+    #         raise AttributeError('no interpolation function called ' + method)
 
     def linear_nojit(self, dtype, point):
         """Non-JIT linear interpolation for 2D self"""

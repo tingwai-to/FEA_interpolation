@@ -1,9 +1,10 @@
 import time
 import os
 import sys
+from node import Node2D
+from element2d import Element2D
 import linear
 import idw
-from element2d import Element2D
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -15,7 +16,10 @@ v1 = 1.
 v2 = 2.
 v3 = 3.
 
-triangle = Element2D(p1, p2, p3, v1, v2, v3)
+node1 = Node2D(p1, v1)
+node2 = Node2D(p2, v2)
+node3 = Node2D(p3, v3)
+triangle = Element2D(node1, node2, node3)
 
 x_min = min(_[0] for _ in (p1, p2, p3))
 y_min = min(_[1] for _ in (p1, p2, p3))

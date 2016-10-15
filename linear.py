@@ -131,9 +131,6 @@ def make_2d_jit(dtype):
     return linear_2d
 
 
-
-
-
 linear_2d_f64 = make_2d_jit(nb.float64)
 linear_2d_f32 = make_2d_jit(nb.float32)
 
