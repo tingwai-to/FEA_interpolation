@@ -2,9 +2,28 @@ from __future__ import print_function
 import numpy as np
 import numpy.linalg as npla
 from numpy import sqrt
+from numba import jit
+import numba as nb
 
 
-class Element2D(object):
+class Element(object):
+    def __init__(self):
+        raise NotImplementedError('Abstract class')
+
+
+class Elem3D(Element):
+    def __init__(self, node1, node2, node3, node4):
+        self.p1 = node1.coord
+        self.p2 = node2.coord
+        self.p3 = node3.coord
+        self.p4 = node4.coord
+        self.v1 = node1.value
+        self.v2 = node2.value
+        self.v3 = node3.value
+        self.v4 = node4.value
+
+
+class Elem2D(Element):
     def __init__(self, node1, node2, node3):
         self.p1 = node1.coord
         self.p2 = node2.coord
@@ -23,6 +42,45 @@ class Element2D(object):
     #             raise ValueError('missing IDW argument: power')
     #     else:
     #         raise AttributeError('no interpolation function called ' + method)
+
+
+    def linear_jit(self, dtype, point):
+        # TODO: fix dtype, method not complete
+        @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:, :],
+                      dtype, dtype, dtype),
+             nopython=True)
+        def linear(p1, p2, p3, point, v1, v2, v3):
+            """JIT optimized linear interpolation for 2D element"""
+            # Transformation matrix to reference element
+            trans = np.empty((2,2), dtype=dtype)
+            trans[0,0] = p2[0] - p1[0]
+            trans[0,1] = p3[0] - p1[0]
+            trans[1,0] = p2[1] - p1[1]
+            trans[1,1] = p3[1] - p1[1]
+            trans = npla.inv(trans)
+
+            v_point = np.empty(point.shape[1], dtype=dtype)
+            for j in range(point.shape[1]):
+                # Transform points to new space
+                ref_point_x = trans[0,0]*(point[0,j]-p1[0]) + \
+                              trans[0,1]*(point[1,j]-p1[0])
+                ref_point_y = trans[1,0]*(point[0,j]-p1[1]) + \
+                              trans[1,1]*(point[1,j]-p1[1])
+                area2 = 0.5*ref_point_x
+                area3 = 0.5*ref_point_y
+                area1 = 0.5 - area2 - area3
+
+                if (area1/0.5) < 0 or \
+                   (area1/0.5) > 1 or \
+                   (area2/0.5) < 0 or \
+                   (area2/0.5) > 1 or \
+                   (area3/0.5) < 0 or \
+                   (area3/0.5) > 1:
+                    v_point[j] = -1
+                else:
+                    v_point[j] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
+            return v_point
+        return linear(self.p1, self.p2, self.p3, point, self.v1, self.v2, self.v3)
 
     def linear_nojit(self, dtype, point):
         """Non-JIT linear interpolation for 2D self"""

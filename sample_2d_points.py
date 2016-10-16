@@ -2,11 +2,13 @@ import time
 import os
 import sys
 from node import Node2D
-from element2d import Element2D
+from element import Elem2D
 import linear
 import idw
 import numpy as np
 import matplotlib.pyplot as plt
+import numba as nb
+
 
 # 2D sample points
 p1 = np.array([2,2], dtype='f8')
@@ -19,7 +21,7 @@ v3 = 3.
 node1 = Node2D(p1, v1)
 node2 = Node2D(p2, v2)
 node3 = Node2D(p3, v3)
-triangle = Element2D(node1, node2, node3)
+triangle = Elem2D(node1, node2, node3)
 
 x_min = min(_[0] for _ in (p1, p2, p3))
 y_min = min(_[1] for _ in (p1, p2, p3))
@@ -71,17 +73,12 @@ for N in Ns:
     nojitidw32.append(end-start)
 
     start = time.time()
-    linear.linear_2d_f64(p1, p2, p3, points_f64,
-                         v1, v2, v3)
+    triangle.linear_jit(nb.float64, points_f64)
     end = time.time()
     jit64.append(end-start)
 
     start = time.time()
-    linear.linear_2d_f32(p1.astype(np.float32),
-                         p2.astype(np.float32),
-                         p3.astype(np.float32),
-                         points_f32,
-                         v1, v2, v3)
+    triangle.linear_jit(nb.float32, points_f32)
     end = time.time()
     jit32.append(end-start)
 
