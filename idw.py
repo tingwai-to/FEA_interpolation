@@ -33,25 +33,6 @@ def make_3d_idw_jit(dtype):
     return simple_3d
 
 
-def simple_3d_nojit(p1, p2, p3, p4, point, v1, v2, v3, v4, power):
-    """Non-JIT simple inverse distance weighting"""
-    def distance(xn, x):
-        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2 + (xn[2]-x[2])**2)
-
-    def weight(xn, x, p):
-        return 1 / distance(xn,x)**p
-
-    v_point = (v1*weight(p1, point, power) +
-               v2*weight(p2, point, power) +
-               v3*weight(p3, point, power) +
-               v4*weight(p4, point, power)) / \
-              (weight(p1, point, power) +
-               weight(p2, point, power) +
-               weight(p3, point, power) +
-               weight(p4, point, power))
-    return v_point
-
-
 def make_2d_idw_jit(dtype):
     @jit(dtype[:](dtype[:], dtype[:,:]), nopython=True)
     def distance(xn, x):

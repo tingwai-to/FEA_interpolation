@@ -3,6 +3,7 @@ import os
 import sys
 from node import Node2D
 from element import Elem2D
+import element
 import linear
 import idw
 import numpy as np
@@ -63,32 +64,32 @@ for N in Ns:
     idw32.append(end-start)
 
     start = time.time()
-    triangle.idw_nojit(np.float64, points_f64, power=2)
+    triangle.idw_nojit(points_f64, power=2)
     end = time.time()
     nojitidw64.append(end-start)
 
     start = time.time()
-    triangle.idw_nojit(np.float32, points_f32, power=2)
+    triangle.idw_nojit(points_f32, power=2)
     end = time.time()
     nojitidw32.append(end-start)
 
     start = time.time()
-    triangle.linear_jit(nb.float64, points_f64)
+    element.make_2d_jit(triangle, points_f64)
     end = time.time()
     jit64.append(end-start)
 
     start = time.time()
-    triangle.linear_jit(nb.float32, points_f32)
+    element.make_2d_jit(triangle, points_f32)
     end = time.time()
     jit32.append(end-start)
 
     start = time.time()
-    triangle.linear_nojit(np.float64, points_f64)
+    triangle.linear_nojit(points_f64)
     end = time.time()
     nojit64.append(end-start)
 
     start = time.time()
-    triangle.linear_nojit(np.float32, points_f32)
+    triangle.linear_nojit(points_f32)
     end = time.time()
     nojit32.append(end-start)
 

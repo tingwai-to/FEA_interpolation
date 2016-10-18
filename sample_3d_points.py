@@ -1,10 +1,15 @@
 import time
 import os
 import sys
+from node import Node3D
+from element import Elem3D
+import element
 import linear
 import idw
 import numpy as np
 import matplotlib.pyplot as plt
+import numba as nb
+
 
 # 3D sample points
 p1 = np.array([2,2,1], dtype="f8")
@@ -15,6 +20,12 @@ v1 = 0.7
 v2 = 2.2
 v3 = 3.4
 v4 = 4.6
+
+node1 = Node3D(p1, v1)
+node2 = Node3D(p2, v2)
+node3 = Node3D(p3, v3)
+node4 = Node3D(p4, v4)
+triangle = Elem3D(node1, node2, node3, node4)
 
 x_min = min(_[0] for _ in (p1, p2, p3, p4))
 y_min = min(_[1] for _ in (p1, p2, p3, p4))
@@ -60,18 +71,12 @@ for N in Ns:
     idw32.append(end-start)
 
     start = time.time()
-    idw.simple_3d_nojit(p1, p2, p3, p4, points_f64,
-                        v1, v2, v3, v4, 2)
+    triangle.idw_nojit(points_f64, power=2)
     end = time.time()
     nojitidw64.append(end-start)
 
     start = time.time()
-    idw.simple_3d_nojit(p1.astype(np.float32),
-                        p2.astype(np.float32),
-                        p3.astype(np.float32),
-                        p4.astype(np.float32),
-                        points_f32,
-                        v1, v2, v3, v4, 2)
+    triangle.idw_nojit(points_f32, power=2)
     end = time.time()
     nojitidw32.append(end-start)
 
@@ -92,18 +97,12 @@ for N in Ns:
     jit32.append(end-start)
 
     start = time.time()
-    linear.linear_3d_nojit64(p1, p2, p3, p4, points_f64,
-                             v1, v2, v3, v4)
+    triangle.linear_nojit(points_f64)
     end = time.time()
     nojit64.append(end-start)
 
     start = time.time()
-    linear.linear_3d_nojit32(p1.astype(np.float32),
-                             p2.astype(np.float32),
-                             p3.astype(np.float32),
-                             p4.astype(np.float32),
-                             points_f32,
-                             v1, v2, v3, v4)
+    triangle.linear_nojit(points_f32)
     end = time.time()
     nojit32.append(end-start)
 
