@@ -10,6 +10,14 @@ class Element(object):
     def __init__(self):
         raise NotImplementedError('Abstract class')
 
+    def sample(self, method, point, **kwargs):
+        if method == 'linear':
+            return self.linear_nojit(point)
+        elif method == 'idw':
+            return self.idw_nojit(point, power=kwargs.get('power', 2))
+        else:
+            raise AttributeError('no interpolation function called ' + method)
+
 
 class Elem3D(Element):
     def __init__(self, node1, node2, node3, node4):
@@ -99,19 +107,6 @@ class Elem2D(Element):
         self.v2 = node2.value
         self.v3 = node3.value
 
-
-    def sample(self, method, dtype, point, **kwargs):
-        if method == 'linear':
-            return self.linear_nojit(dtype, point)
-        elif method == 'idw':
-            if 'power' in kwargs:
-                return self.idw_nojit(dtype, point, kwargs['power'])
-            else:
-                raise ValueError('missing IDW argument: power')
-        else:
-            raise AttributeError('no interpolation function called ' + method)
-
-
     def linear_nojit(self, point):
         """Non-JIT linear interpolation for 2D self"""
         dtype = point.dtype
@@ -170,7 +165,7 @@ class Elem2D(Element):
 
 def make_2d_jit(element, point):
     dtype = point.dtype
-    # jit_type = TODO: get numba dtype from numpy object
+    jit_type = nb.from_dtype(dtype)
     p1 = element.p1.astype(dtype)
     p2 = element.p2.astype(dtype)
     p3 = element.p3.astype(dtype)
@@ -178,8 +173,8 @@ def make_2d_jit(element, point):
     v2 = element.v2
     v3 = element.v3
 
-    @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:,:],
-         dtype, dtype, dtype),
+    @jit(jit_type[:](jit_type[:], jit_type[:], jit_type[:], jit_type[:,:],
+         jit_type, jit_type, jit_type),
          nopython=True)
     def linear_2d(p1, p2, p3, point, v1, v2, v3):
         """JIT optimized linear interpolation for 2D element"""
