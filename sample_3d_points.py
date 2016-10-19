@@ -1,6 +1,3 @@
-import time
-import os
-import sys
 from node import Node3D
 from element import Elem3D
 import element
@@ -9,6 +6,9 @@ import idw
 import numpy as np
 import matplotlib.pyplot as plt
 import numba as nb
+from time import time
+import os
+import sys
 
 
 # 3D sample points
@@ -54,56 +54,48 @@ for N in Ns:
     points_f64 = np.array([_.ravel() for _ in (x, y, z)], dtype="f8")
     points_f32 = np.array([_.ravel() for _ in (x, y, z)], dtype="f")
 
-    start = time.time()
-    idw.idw_3d_f64(p1, p2, p3, p4, points_f64,
-                   v1, v2, v3, v4, 2)
-    end = time.time()
+    # IDW JIT
+    start = time()
+    element.idw_3d_jit(triangle, points_f64, power=2)
+    end = time()
     idw64.append(end-start)
 
-    start = time.time()
-    idw.idw_3d_f32(p1.astype(np.float32),
-                   p2.astype(np.float32),
-                   p3.astype(np.float32),
-                   p4.astype(np.float32),
-                   points_f32,
-                   v1, v2, v3, v4, 2)
-    end = time.time()
+    start = time()
+    element.idw_3d_jit(triangle, points_f32, power=2)
+    end = time()
     idw32.append(end-start)
 
-    start = time.time()
-    triangle.idw_nojit(points_f64, power=2)
-    end = time.time()
+    # IDW NO-JIT
+    start = time()
+    triangle.sample('idw', points_f64, power=2)
+    end = time()
     nojitidw64.append(end-start)
 
-    start = time.time()
-    triangle.idw_nojit(points_f32, power=2)
-    end = time.time()
+    start = time()
+    triangle.sample('idw', points_f32, power=2)
+    end = time()
     nojitidw32.append(end-start)
 
-    start = time.time()
-    linear.linear_3d_f64(p1, p2, p3, p4, points_f64,
-                         v1, v2, v3, v4)
-    end = time.time()
+    # Linear JIT
+    start = time()
+    element.linear_3d_jit(triangle, points_f64)
+    end = time()
     jit64.append(end-start)
 
-    start = time.time()
-    linear.linear_3d_f32(p1.astype(np.float32),
-                         p2.astype(np.float32),
-                         p3.astype(np.float32),
-                         p4.astype(np.float32),
-                         points_f32,
-                         v1, v2, v3, v4)
-    end = time.time()
+    start = time()
+    element.linear_3d_jit(triangle, points_f32)
+    end = time()
     jit32.append(end-start)
 
-    start = time.time()
-    triangle.linear_nojit(points_f64)
-    end = time.time()
+    # Linear NO-JIT
+    start = time()
+    triangle.sample('linear', points_f64)
+    end = time()
     nojit64.append(end-start)
 
-    start = time.time()
-    triangle.linear_nojit(points_f32)
-    end = time.time()
+    start = time()
+    triangle.sample('linear', points_f32)
+    end = time()
     nojit32.append(end-start)
 
 
@@ -160,6 +152,8 @@ plt.savefig("3d_speed_comparison_rel.png")
 
 
 """
+# Plot individual function
+N=128
 x, y, z = np.mgrid[x_min:x_max:1j*N,
                    y_min:y_max:1j*N,
                    z_min:z_max:1j*N]
