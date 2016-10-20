@@ -10,16 +10,20 @@ class Element(object):
     def __init__(self):
         raise NotImplementedError('Abstract class')
 
-    def sample(self, method, point, **kwargs):
-        if method == 'linear':
-            return self.linear_nojit(point)
-        elif method == 'idw':
-            return self.idw_nojit(point, power=kwargs.get('power', 2))
+    def sample(self, method, point, *args, **kwargs):
+        use_jit = kwargs.pop("jit", False)
+        if use_jit:
+            funcs = jit_functions['%sd' % self.dimensionality][method]
+            func = funcs[nb.numpy_support.from_dtype(point.dtype)]
+            self._call_jit(func, point, *args, **kwargs)
         else:
-            raise AttributeError('no interpolation function called %s' % method)
-
+            func = getattr(self, '%s_nojit' % method, None)
+            if func is None:
+                raise AttributeError('no interpolation function called %s' % method)
+            return func(point, *args, **kwargs)
 
 class Elem3D(Element):
+    dimensionality = 3
     def __init__(self, node1, node2, node3, node4):
         self.p1 = node1.coord
         self.p2 = node2.coord
@@ -97,8 +101,18 @@ class Elem3D(Element):
                    weight(p4, point, power))
         return v_point
 
+    def _call_jit(self, func, point, *args, **kwargs):
+        dtype = point.dtype
+        return func(self.p1.astype(dtype),
+                    self.p2.astype(dtype),
+                    self.p3.astype(dtype),
+                    self.p4.astype(dtype),
+                    point,
+                    self.v1, self.v2, self.v3, self.v4, *args, **kwargs)
+
 
 class Elem2D(Element):
+    dimensionality = 2
     def __init__(self, node1, node2, node3):
         self.p1 = node1.coord
         self.p2 = node2.coord
@@ -162,6 +176,13 @@ class Elem2D(Element):
                    weight(p3, point, power))
         return v_point
 
+    def _call_jit(self, func, point, *args, **kwargs):
+        dtype = point.dtype
+        return func(self.p1.astype(dtype),
+                    self.p2.astype(dtype),
+                    self.p3.astype(dtype),
+                    point,
+                    self.v1, self.v2, self.v3, *args, **kwargs)
 
 def make_3d_lin_jit(dtype):
     @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:], dtype[:,:],
@@ -311,93 +332,20 @@ def make_2d_idw_jit(dtype):
         return v_point
     return simple_2d
 
+jit_functions = {}
 
-def linear_3d_jit(element, point):
-    """Calls linear JIT for 3D element depending on dtype"""
-    if point.dtype == np.float64:
-        return linear_3d_f64(element.p1.astype(np.float64),
-                             element.p2.astype(np.float64),
-                             element.p3.astype(np.float64),
-                             element.p4.astype(np.float64),
-                             point,
-                             element.v1, element.v2, element.v3, element.v4)
-    elif point.dtype == np.float32:
-        return linear_3d_f32(element.p1.astype(np.float32),
-                             element.p2.astype(np.float32),
-                             element.p3.astype(np.float32),
-                             element.p4.astype(np.float32),
-                             point,
-                             element.v1, element.v2, element.v3, element.v4)
-    else:
-        raise AttributeError('Data type %s not supported' % point.dtype)
+jit_functions['3d'] = {}
+jit_functions['3d']['linear'] = {}
+jit_functions['3d']['linear'][nb.float64] = make_3d_lin_jit(nb.float64)
+jit_functions['3d']['linear'][nb.float32] = make_3d_lin_jit(nb.float32)
+jit_functions['3d']['idw'] = {}
+jit_functions['3d']['idw'][nb.float64] = make_3d_idw_jit(nb.float64)
+jit_functions['3d']['idw'][nb.float32] = make_3d_idw_jit(nb.float32)
 
-
-def linear_2d_jit(element, point):
-    """Calls linear JIT for 2D element depending on dtype"""
-    if point.dtype == np.float64:
-        return linear_2d_f64(element.p1.astype(np.float64),
-                             element.p2.astype(np.float64),
-                             element.p3.astype(np.float64),
-                             point,
-                             element.v1, element.v2, element.v3)
-    elif point.dtype == np.float32:
-        return linear_2d_f32(element.p1.astype(np.float32),
-                             element.p2.astype(np.float32),
-                             element.p3.astype(np.float32),
-                             point,
-                             element.v1, element.v2, element.v3)
-
-
-def idw_3d_jit(element, point, power=2):
-    """Calls IDW JIT for 3D element depending on dtype"""
-    if point.dtype == np.float64:
-        return idw_3d_f64(element.p1.astype(np.float64),
-                          element.p2.astype(np.float64),
-                          element.p3.astype(np.float64),
-                          element.p4.astype(np.float64),
-                          point,
-                          element.v1, element.v2, element.v3, element.v4,
-                          power)
-    elif point.dtype == np.float32:
-        return idw_3d_f32(element.p1.astype(np.float32),
-                          element.p2.astype(np.float32),
-                          element.p3.astype(np.float32),
-                          element.p4.astype(np.float32),
-                          point,
-                          element.v1, element.v2, element.v3, element.v4,
-                          power)
-    else:
-        raise AttributeError('Data type %s not supported' % point.dtype)
-
-
-def idw_2d_jit(element, point, power=2):
-    """Calls IDW JIT for 2D element depending on dtype"""
-    if point.dtype == np.float64:
-        return idw_2d_f64(element.p1.astype(np.float64),
-                          element.p2.astype(np.float64),
-                          element.p3.astype(np.float64),
-                          point,
-                          element.v1, element.v2, element.v3,
-                          power)
-    elif point.dtype == np.float32:
-        return idw_2d_f32(element.p1.astype(np.float32),
-                          element.p2.astype(np.float32),
-                          element.p3.astype(np.float32),
-                          point,
-                          element.v1, element.v2, element.v3,
-                          power)
-    else:
-        raise AttributeError('Data type %s not supported' % point.dtype)
-
-
-linear_3d_f64 = make_3d_lin_jit(nb.float64)
-linear_3d_f32 = make_3d_lin_jit(nb.float32)
-
-linear_2d_f64 = make_2d_lin_jit(nb.float64)
-linear_2d_f32 = make_2d_lin_jit(nb.float32)
-
-idw_3d_f64 = make_3d_idw_jit(nb.float64)
-idw_3d_f32 = make_3d_idw_jit(nb.float32)
-
-idw_2d_f64 = make_2d_idw_jit(nb.float64)
-idw_2d_f32 = make_2d_idw_jit(nb.float32)
+jit_functions['2d']= {}
+jit_functions['2d']['linear'] = {}
+jit_functions['2d']['linear'][nb.float64] = make_2d_lin_jit(nb.float64)
+jit_functions['2d']['linear'][nb.float32] = make_2d_lin_jit(nb.float32)
+jit_functions['2d']['idw'] = {}
+jit_functions['2d']['idw'][nb.float64] = make_2d_idw_jit(nb.float64)
+jit_functions['2d']['idw'][nb.float32] = make_2d_idw_jit(nb.float32)
