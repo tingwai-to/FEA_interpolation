@@ -51,12 +51,12 @@ for N in Ns:
 
     # IDW JIT
     start = time()
-    element.idw_2d_jit(triangle, points_f64, power=2)
+    triangle.sample("idw", points_f64, jit=True, power=2)
     end = time()
     idw64.append(end-start)
 
     start = time()
-    element.idw_2d_jit(triangle, points_f32, power=2)
+    triangle.sample("idw", points_f32, jit=True, power=2)
     end = time()
     idw32.append(end-start)
 
@@ -73,12 +73,12 @@ for N in Ns:
 
     # Linear JIT
     start = time()
-    element.linear_2d_jit(triangle, points_f64)
+    triangle.sample("linear", points_f64, jit=True)
     end = time()
     jit64.append(end-start)
 
     start = time()
-    element.linear_2d_jit(triangle, points_f32)
+    triangle.sample("linear", points_f32, jit=True)
     end = time()
     jit32.append(end-start)
 
