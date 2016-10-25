@@ -15,7 +15,7 @@ class Element(object):
         if use_jit:
             funcs = jit_functions['%sd' % self.dimensionality][method]
             func = funcs[nb.numpy_support.from_dtype(point.dtype)]
-            self._call_jit(func, point, *args, **kwargs)
+            return self._call_jit(func, point, *args, **kwargs)
         else:
             func = getattr(self, '%s_nojit' % method, None)
             if func is None:
@@ -145,10 +145,12 @@ class Elem2D(Element):
 
         v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
 
-        # mask = np.ones_like(v_point, dtype="bool")
-        # for a in [area1, area2, area3]:
-        #     mask *= (a/tot_area) > 0
-        #     mask *= (a/tot_area) < 1
+        mask = np.ones_like(v_point, dtype="bool")
+        for a in [area1, area2, area3]:
+            mask *= (a/tot_area) > 0
+            mask *= (a/tot_area) < 1
+
+        v_point = np.ma.MaskedArray(v_point, ~mask)
 
         return v_point#, mask
 

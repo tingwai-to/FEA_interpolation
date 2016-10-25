@@ -156,10 +156,10 @@ points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
 points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
 
 power = 128
-buff = element.linear_2d_jit(triangle, points_f64)
+buff = triangle.sample('linear', points_f64, jit=True)
 buff.shape = x.shape
 
-
+plt.figure()
 plt.imshow(buff.T, extent=[x_min, x_max, y_min, y_max], origin='lower',
            interpolation='nearest')
 plt.plot([p1[0], p2[0], p3[0], p1[0]], [p1[1], p2[1], p3[1], p1[1]], '-k')
