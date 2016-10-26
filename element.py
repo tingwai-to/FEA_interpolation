@@ -22,6 +22,7 @@ class Element(object):
                 raise AttributeError('no interpolation function called %s' % method)
             return func(point, *args, **kwargs)
 
+
 class Elem3D(Element):
     dimensionality = 3
     def __init__(self, node1, node2, node3, node4):
@@ -75,11 +76,8 @@ class Elem3D(Element):
 
     def idw_nojit(self, point, power=2):
         """Non-JIT simple inverse distance weighting"""
-        def distance(xn, x):
-            return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2 + (xn[2]-x[2])**2)
-
         def weight(xn, x, p):
-            return 1 / distance(xn,x)**p
+            return 1 / self._distance(xn,x)**p
 
         dtype = point.dtype
         p1 = self.p1.astype(dtype)
@@ -101,6 +99,31 @@ class Elem3D(Element):
                    weight(p4, point, power))
         return v_point
 
+    def nearest_nojit(self, point):
+        """Non-JIT nearest neighbor"""
+        dtype = point.dtype
+        p1 = self.p1
+        p2 = self.p2
+        p3 = self.p3
+        p4 = self.p4
+        v1 = self.v1
+        v2 = self.v2
+        v3 = self.v3
+        v4 = self.v4
+        values = (v1, v2, v3, v4)
+
+        dist = np.empty((4, point.shape[1]), dtype=dtype)
+        dist[0] = self._distance(p1, point)
+        dist[1] = self._distance(p2, point)
+        dist[2] = self._distance(p3, point)
+        dist[3] = self._distance(p4, point)
+
+        nearest = np.empty(point.shape[1], dtype=dtype)
+        for j in range(dist.shape[1]):
+            nearest[j] = values[np.argmin(dist[:,j])]
+
+        return nearest
+
     def _call_jit(self, func, point, *args, **kwargs):
         dtype = point.dtype
         return func(self.p1.astype(dtype),
@@ -109,6 +132,10 @@ class Elem3D(Element):
                     self.p4.astype(dtype),
                     point,
                     self.v1, self.v2, self.v3, self.v4, *args, **kwargs)
+
+    @staticmethod
+    def _distance(xn, x):
+        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2 + (xn[2]-x[2])**2)
 
 
 class Elem2D(Element):
@@ -156,11 +183,8 @@ class Elem2D(Element):
 
     def idw_nojit(self, point, power=2):
         """Non-JIT simple inverse distance weighting"""
-        def distance(xn, x):
-            return sqrt((xn[0] - x[0]) ** 2 + (xn[1] - x[1]) ** 2)
-
         def weight(xn, x, p):
-            return 1 / distance(xn, x) ** p
+            return 1 / self._distance(xn, x) ** p
 
         dtype = point.dtype
         p1 = self.p1.astype(dtype)
@@ -178,13 +202,40 @@ class Elem2D(Element):
                    weight(p3, point, power))
         return v_point
 
-    def _call_jit(self, func, point, *args, **kwargs):
+    def nearest_nojit(self, point):
+        """Non-JIT nearest neighbor"""
         dtype = point.dtype
-        return func(self.p1.astype(dtype),
-                    self.p2.astype(dtype),
-                    self.p3.astype(dtype),
-                    point,
-                    self.v1, self.v2, self.v3, *args, **kwargs)
+        p1 = self.p1
+        p2 = self.p2
+        p3 = self.p3
+        v1 = self.v1
+        v2 = self.v2
+        v3 = self.v3
+        values = (v1, v2, v3)
+
+        dist = np.empty((3, point.shape[1]), dtype=dtype)
+        dist[0] = self._distance(p1, point)
+        dist[1] = self._distance(p2, point)
+        dist[2] = self._distance(p3, point)
+
+        nearest = np.empty(point.shape[1], dtype=dtype)
+        for j in range(dist.shape[1]):
+            nearest[j] = values[np.argmin(dist[:,j])]
+
+        return nearest
+
+    def _call_jit(self, func, point, *args, **kwargs):
+            dtype = point.dtype
+            return func(self.p1.astype(dtype),
+                        self.p2.astype(dtype),
+                        self.p3.astype(dtype),
+                        point,
+                        self.v1, self.v2, self.v3, *args, **kwargs)
+
+    @staticmethod
+    def _distance(xn, x):
+        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
+
 
 def make_3d_lin_jit(dtype):
     @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:], dtype[:,:],
