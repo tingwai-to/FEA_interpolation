@@ -38,6 +38,10 @@ def speed_comparison():
     idw32 = []
     nojitidw64 = []
     nojitidw32 = []
+    nn64 = []
+    nn32 = []
+    nojitnn64 = []
+    nojitnn32 = []
     Ns = np.array([8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096])
 
     for N in Ns:
@@ -46,6 +50,28 @@ def speed_comparison():
 
         points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
         points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
+
+        # NN JIT
+        start = time()
+        triangle.sample("nearest", points_f64, jit=True)
+        end = time()
+        nn64.append(end - start)
+
+        start = time()
+        triangle.sample("nearest", points_f32, jit=True)
+        end = time()
+        nn32.append(end - start)
+
+        # NN NO-JIT
+        start = time()
+        triangle.sample('nearest', points_f64)
+        end = time()
+        nojitnn64.append(end - start)
+
+        start = time()
+        triangle.sample('nearest', points_f32)
+        end = time()
+        nojitnn32.append(end - start)
 
         # IDW JIT
         start = time()
@@ -100,6 +126,10 @@ def speed_comparison():
     ax.loglog(Ns, idw32, '-o', color='#A9A9A9', label='IDW-32')
     ax.loglog(Ns, nojitidw64, '-ok', label='NOJIT-IDW-64')
     ax.loglog(Ns, nojitidw32, '-oc', label='NOJIT-IDW-32')
+    ax.loglog(Ns, nn64, '--sg', label='NN-64')
+    ax.loglog(Ns, nn32, '--sr', label='NN-32')
+    ax.loglog(Ns, nojitnn64, '--sb', label='NOJIT-NN-64')
+    ax.loglog(Ns, nojitnn32, '--sy', label='NOJIT-NN-32')
     ax.set_xscale('log', basex=2)
     ax.set_yscale('log', basey=10)
     plt.legend(loc=2)
@@ -116,6 +146,10 @@ def speed_comparison():
     idw32 = np.array(idw32)
     nojitidw64 = np.array(nojitidw64)
     nojitidw32 = np.array(nojitidw32)
+    nn64 = np.array(nn64)
+    nn32 = np.array(nn32)
+    nojitnn64 = np.array(nojitnn64)
+    nojitnn32 = np.array(nojitnn32)
 
     rel_jit64 = (jit64 / (Ns*Ns))
     rel_jit32 = (jit32 / (Ns*Ns))
@@ -125,6 +159,10 @@ def speed_comparison():
     rel_idw32 = (idw32 / (Ns*Ns))
     rel_nojitidw64 = (nojitidw64 / (Ns*Ns))
     rel_nojitidw32 = (nojitidw32 / (Ns*Ns))
+    rel_nn64 = (nn64 / (Ns*Ns))
+    rel_nn32 = (nn32 / (Ns*Ns))
+    rel_nojitnn64 = (nojitnn64 / (Ns*Ns))
+    rel_nojitnn32 = (nojitnn32 / (Ns*Ns))
 
     plt.clf()
     ax = plt.gca()
@@ -136,6 +174,10 @@ def speed_comparison():
     ax.loglog(Ns, rel_idw32, '-o', color='#A9A9A9', label='IDW-32')
     ax.loglog(Ns, rel_nojitidw64, '-ok', label='NOJIT-IDW-64')
     ax.loglog(Ns, rel_nojitidw32, '-oc', label='NOJIT-IDW-32')
+    ax.loglog(Ns, rel_nn64, '--sg', label='NN-64')
+    ax.loglog(Ns, rel_nn32, '--sr', label='NN-32')
+    ax.loglog(Ns, rel_nojitnn64, '--sb', label='NOJIT-NN-64')
+    ax.loglog(Ns, rel_nojitnn32, '--sy', label='NOJIT-NN-32')
     ax.set_xscale('log', basex=2)
     ax.set_yscale('log', basey=10)
     plt.legend(loc=1)
@@ -154,7 +196,7 @@ def test_individual():
     points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
 
     power = 128 # to exaggerate visualization of IDW
-    buff = triangle.sample('nearest', points_f64)
+    buff = triangle.sample('nearest', points_f64, jit=True)
     buff.shape = x.shape
 
     plt.figure()
@@ -165,5 +207,5 @@ def test_individual():
     plt.savefig('output_2d.png')
 
 
-# speed_comparison()
-test_individual()
+speed_comparison()
+# test_individual()

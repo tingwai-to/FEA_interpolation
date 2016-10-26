@@ -332,6 +332,32 @@ def make_2d_lin_jit(dtype):
     return linear_2d
 
 
+def make_2d_nn_jit(dtype):
+    @jit(dtype[:](dtype[:], dtype[:,:]), nopython=True)
+    def distance(xn, x):
+        """Distance of nodes to points"""
+        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
+
+    @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:,:],
+         dtype, dtype, dtype),
+         nopython=True)
+    def nearest_2d(p1, p2, p3, point, v1, v2, v3):
+        """JIT optimized nearest neighbor interpolation for 2D element"""
+        values = (v1, v2, v3)
+
+        dist = np.empty((3, point.shape[1]), dtype=dtype)
+        dist[0] = distance(p1, point)
+        dist[1] = distance(p2, point)
+        dist[2] = distance(p3, point)
+
+        nearest = np.empty(point.shape[1], dtype=dtype)
+        for j in range(dist.shape[1]):
+            nearest[j] = values[np.argmin(dist[:,j])]
+
+        return nearest
+    return nearest_2d
+
+
 def make_3d_idw_jit(dtype):
     @jit(dtype[:](dtype[:], dtype[:,:]), nopython=True)
     def distance(xn, x):
@@ -402,3 +428,6 @@ jit_functions['2d']['linear'][nb.float32] = make_2d_lin_jit(nb.float32)
 jit_functions['2d']['idw'] = {}
 jit_functions['2d']['idw'][nb.float64] = make_2d_idw_jit(nb.float64)
 jit_functions['2d']['idw'][nb.float32] = make_2d_idw_jit(nb.float32)
+jit_functions['2d']['nearest'] = {}
+jit_functions['2d']['nearest'][nb.float64] = make_2d_nn_jit(nb.float64)
+jit_functions['2d']['nearest'][nb.float32] = make_2d_nn_jit(nb.float32)
