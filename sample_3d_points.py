@@ -3,6 +3,7 @@ from element import Elem3D
 import element
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import numba as nb
 from time import time
 import os
@@ -36,127 +37,66 @@ z_max = max(_[2] for _ in (p1, p2, p3, p4))
 def speed_comparison():
     # JIT vs non-JIT
     fig, ax = plt.subplots()
-    jit64 = []
-    jit32 = []
-    nojit32 = []
-    nojit64 = []
-    idw64 = []
-    idw32 = []
-    nojitidw64 = []
-    nojitidw32 = []
+    funcs = [('linear', 64, True), ('linear', 32, True),
+             ('linear', 64, False), ('linear', 32, False),
+             ('idw', 64, True), ('idw', 32, True),
+             ('idw', 64, False), ('idw', 32, False),
+             # ('nearest', 64, True), ('nearest', 32, True),
+             ('nearest', 64, False), ('nearest', 32, False)]
+
     Ns = np.array([8, 16, 32, 64, 128, 256])
+    times = np.empty((len(funcs), Ns.shape[0]))
 
-    for N in Ns:
-        x, y, z = np.mgrid[x_min:x_max:1j*N,
-                           y_min:y_max:1j*N,
-                           z_min:z_max:1j*N]
-
+    for i, N in enumerate(Ns):
+        x, y, z = np.mgrid[x_min:x_max:1j * N,
+                           y_min:y_max:1j * N,
+                           z_min:z_max:1j * N]
         points_f64 = np.array([_.ravel() for _ in (x, y, z)], dtype="f8")
         points_f32 = np.array([_.ravel() for _ in (x, y, z)], dtype="f")
 
-        # IDW JIT
-        start = time()
-        triangle.sample("idw", points_f64, jit=True, power=2)
-        end = time()
-        idw64.append(end-start)
+        for j, fun in enumerate(funcs):
+            if fun[0] == 'idw':
+                start = time()
+                triangle.sample(fun[0], eval('points_f%s' % fun[1]), jit=fun[2], power=2)
+                end = time()
+            else:
+                start = time()
+                triangle.sample(fun[0], eval('points_f%s' % fun[1]), jit=fun[2])
+                end = time()
+            times[j, i] = end-start
 
-        start = time()
-        triangle.sample("idw", points_f32, jit=True, power=2)
-        end = time()
-        idw32.append(end-start)
-
-        # IDW NO-JIT
-        start = time()
-        triangle.sample('idw', points_f64, power=2)
-        end = time()
-        nojitidw64.append(end-start)
-
-        start = time()
-        triangle.sample('idw', points_f32, power=2)
-        end = time()
-        nojitidw32.append(end-start)
-
-        # Linear JIT
-        start = time()
-        triangle.sample("linear", points_f64, jit=True)
-        end = time()
-        jit64.append(end-start)
-
-        start = time()
-        triangle.sample("linear", points_f32, jit=True)
-        end = time()
-        jit32.append(end-start)
-
-        # Linear NO-JIT
-        start = time()
-        triangle.sample('linear', points_f64)
-        end = time()
-        nojit64.append(end-start)
-
-        start = time()
-        triangle.sample('linear', points_f32)
-        end = time()
-        nojit32.append(end-start)
-
-
-    ax.loglog(Ns, jit64, '-og', label='JIT-64')
-    ax.loglog(Ns, jit32, '-or', label='JIT-32')
-    ax.loglog(Ns, nojit64, '-ob', label='NOJIT-64')
-    ax.loglog(Ns, nojit32, '-oy', label='NOJIT-32')
-    ax.loglog(Ns, idw64, '-om', label='IDW-64')
-    ax.loglog(Ns, idw32, '-o', color='#A9A9A9', label='IDW-32')
-    ax.loglog(Ns, nojitidw64, '-ok', label='NOJIT-IDW-64')
-    ax.loglog(Ns, nojitidw32, '-oc', label='NOJIT-IDW-32')
+    colors = cm.nipy_spectral(np.linspace(0, 1, len(funcs)))
+    for c, row in enumerate(times):
+        ax.loglog(Ns, row, color=colors[c], marker='o', ls='-',
+                  label='%s-%d, jit=%r' % (funcs[c][0], funcs[c][1], funcs[c][2]))
     ax.set_xscale('log', basex=2)
     ax.set_yscale('log', basey=10)
-    plt.legend(loc=2)
+    plt.legend(loc=2, prop={'size':10})
     plt.xlabel('N')
     plt.ylabel('Time [s]')
     plt.savefig("3d_speed_comparison.png")
 
-
-    jit64 = np.array(jit64)
-    jit32 = np.array(jit32)
-    nojit32 = np.array(nojit32)
-    nojit64 = np.array(nojit64)
-    idw64 = np.array(idw64)
-    idw32 = np.array(idw32)
-    nojitidw64 = np.array(nojitidw64)
-    nojitidw32 = np.array(nojitidw32)
-
-    rel_jit64 = (jit64 / (Ns*Ns))
-    rel_jit32 = (jit32 / (Ns*Ns))
-    rel_nojit64 = (nojit64 / (Ns*Ns))
-    rel_nojit32 = (nojit32 / (Ns*Ns))
-    rel_idw64 = (idw64 / (Ns*Ns))
-    rel_idw32 = (idw32 / (Ns*Ns))
-    rel_nojitidw64 = (nojitidw64 / (Ns*Ns))
-    rel_nojitidw32 = (nojitidw32 / (Ns*Ns))
+    rel_times = times / (Ns * Ns)
 
     plt.clf()
     ax = plt.gca()
-    ax.loglog(Ns, rel_jit64, '-og', label='JIT-64')
-    ax.loglog(Ns, rel_jit32, '-or', label='JIT-32')
-    ax.loglog(Ns, rel_nojit64, '-ob', label='NOJIT-64')
-    ax.loglog(Ns, rel_nojit32, '-oy', label='NOJIT-32')
-    ax.loglog(Ns, rel_idw64, '-om', label='IDW-64')
-    ax.loglog(Ns, rel_idw32, '-o', color='#A9A9A9', label='IDW-32')
-    ax.loglog(Ns, rel_nojitidw64, '-ok', label='NOJIT-IDW-64')
-    ax.loglog(Ns, rel_nojitidw32, '-oc', label='NOJIT-IDW-32')
+    for c, row in enumerate(rel_times):
+        ax.loglog(Ns, row, color=colors[c], marker='o', ls='-',
+                  label='%s-%d, jit=%r' % (funcs[c][0], funcs[c][1], funcs[c][2]))
     ax.set_xscale('log', basex=2)
     ax.set_yscale('log', basey=10)
-    plt.legend(loc=2)
+    plt.legend(loc=1, prop={'size':10})
     plt.xlabel('N')
     plt.ylabel('Time per Element')
     plt.savefig("3d_speed_comparison_rel.png")
 
 
-def test_individual():
+def visualize_function():
     # Plot individual function
     N=128
     x, y, z = np.mgrid[x_min:x_max:1j*N,
-              y_min:y_max:1j*N,
-              z_min:z_max:1j*N]
+                       y_min:y_max:1j*N,
+                       z_min:z_max:1j*N]
 
     points_f64 = np.array([_.ravel() for _ in (x, y, z)], dtype="f8")
     points_f32 = np.array([_.ravel() for _ in (x, y, z)], dtype="f")
@@ -168,7 +108,6 @@ def test_individual():
 
     if not os.path.isdir("frames3d"):
         os.mkdir("frames3d")
-
 
     for i in range(N):
         print(i)
@@ -194,3 +133,6 @@ def test_individual():
         plt.colorbar()
         plt.savefig("frames/slice_z_%03i.png" % i)
 
+
+speed_comparison()
+# visualize_function()
