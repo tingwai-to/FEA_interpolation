@@ -3,6 +3,7 @@ import numpy as np
 import numpy.linalg as npla
 from numpy import sqrt
 from numba import jit
+from numba import cuda
 import numba as nb
 
 
@@ -410,6 +411,44 @@ def make_2d_idw_jit(dtype):
                    weight(p3, point, power))
         return v_point
     return simple_2d
+
+
+# TODO: cuda functions are WIP
+@cuda.jit(nb.float64(nb.float64[:], nb.float64[:], nb.float64[:],
+                     nb.float64[:],
+                     nb.float64, nb.float64, nb.float64,
+                     nb.float64[:,:]),
+          device=True)
+def linear_2d_cuda(p1, p2, p3, point, v1, v2, v3, trans):
+    return point[0]     # check visualization
+    ref_point_x = trans[0,0]*(point[0]-p1[0]) + trans[0,1]*(point[1]-p1[0])
+    ref_point_y = trans[1,0]*(point[0]-p1[1]) + trans[1,1]*(point[1]-p1[1])
+
+    area2 = 0.5*ref_point_x
+    area3 = 0.5*ref_point_y
+    area1 = 0.5 - area2 - area3
+
+    if (area1/0.5) < 0 or \
+       (area1/0.5) > 1 or \
+       (area2/0.5) < 0 or \
+       (area2/0.5) > 1 or \
+       (area3/0.5) < 0 or \
+       (area3/0.5) > 1:
+        return -1
+    else:
+        return v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
+
+
+@cuda.jit(nb.void(nb.float64[:,:],
+                  nb.float64[:], nb.float64[:], nb.float64[:],
+                  nb.float64[:,:,:],
+                  nb.float64, nb.float64, nb.float64,
+                  nb.float64[:,:]))
+def make_cuda(result, p1, p2, p3, point, v1, v2, v3, trans):
+    i = cuda.grid(1)
+    for j in range(result[1].size):
+        result[i, j] = linear_2d_cuda(p1, p2, p3, point[i, j], v1, v2, v3, trans)
+
 
 jit_functions = {}
 
