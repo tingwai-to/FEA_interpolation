@@ -14,8 +14,7 @@ class Element(object):
     def sample(self, method, point, *args, **kwargs):
         use_jit = kwargs.pop("jit", False)
         if use_jit:
-            funcs = jit_functions['%sd' % self.dimensionality][method]
-            func = funcs[nb.numpy_support.from_dtype(point.dtype)]
+            func = jit_functions['%sd' % self.dimensionality][method]
             return self._call_jit(func, point, *args, **kwargs)
         else:
             func = getattr(self, '%s_nojit' % method, None)
@@ -294,69 +293,71 @@ def make_3d_lin_jit(dtype):
     return linear_3d
 
 
-def make_2d_lin_jit(dtype):
-    @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:,:],
-         dtype, dtype, dtype),
-         nopython=True)
-    def linear_2d(p1, p2, p3, point, v1, v2, v3):
-        """JIT optimized linear interpolation for 2D element"""
-        # Transformation matrix to reference element
-        trans = np.empty((2,2), dtype=dtype)
-        trans[0,0] = p2[0] - p1[0]
-        trans[0,1] = p3[0] - p1[0]
-        trans[1,0] = p2[1] - p1[1]
-        trans[1,1] = p3[1] - p1[1]
-        trans = npla.inv(trans)
+@jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:], nb.float32[:,:],
+      nb.float32, nb.float32, nb.float32),
+      nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:], nb.float64[:,:],
+      nb.float64, nb.float64, nb.float64)],
+     nopython=True)
+def linear_2d(p1, p2, p3, point, v1, v2, v3):
+    """JIT optimized linear interpolation for 2D element"""
+    # Transformation matrix to reference element
+    trans = np.empty((2,2), dtype=point.dtype)
+    trans[0,0] = p2[0] - p1[0]
+    trans[0,1] = p3[0] - p1[0]
+    trans[1,0] = p2[1] - p1[1]
+    trans[1,1] = p3[1] - p1[1]
+    trans = npla.inv(trans)
 
-        v_point = np.empty(point.shape[1], dtype=dtype)
-        for j in range(point.shape[1]):
-            # Transform points to new space
-            ref_point_x = trans[0,0]*(point[0,j]-p1[0]) + \
-                          trans[0,1]*(point[1,j]-p1[0])
-            ref_point_y = trans[1,0]*(point[0,j]-p1[1]) + \
-                          trans[1,1]*(point[1,j]-p1[1])
-            area2 = 0.5*ref_point_x
-            area3 = 0.5*ref_point_y
-            area1 = 0.5 - area2 - area3
+    v_point = np.empty(point.shape[1], dtype=point.dtype)
+    for j in range(point.shape[1]):
+        # Transform points to new space
+        ref_point_x = trans[0,0]*(point[0,j]-p1[0]) + \
+                      trans[0,1]*(point[1,j]-p1[0])
+        ref_point_y = trans[1,0]*(point[0,j]-p1[1]) + \
+                      trans[1,1]*(point[1,j]-p1[1])
+        area2 = 0.5*ref_point_x
+        area3 = 0.5*ref_point_y
+        area1 = 0.5 - area2 - area3
 
-            if (area1/0.5) < 0 or \
-               (area1/0.5) > 1 or \
-               (area2/0.5) < 0 or \
-               (area2/0.5) > 1 or \
-               (area3/0.5) < 0 or \
-               (area3/0.5) > 1:
-                v_point[j] = -1
-            else:
-                v_point[j] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
+        if (area1/0.5) < 0 or \
+           (area1/0.5) > 1 or \
+           (area2/0.5) < 0 or \
+           (area2/0.5) > 1 or \
+           (area3/0.5) < 0 or \
+           (area3/0.5) > 1:
+            v_point[j] = -1
+        else:
+            v_point[j] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
 
-        return v_point
-    return linear_2d
+    return v_point
 
 
-def make_2d_nn_jit(dtype):
-    @jit(dtype[:](dtype[:], dtype[:,:]), nopython=True)
-    def distance(xn, x):
-        """Distance of nodes to points"""
-        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
+@jit([nb.float32[:](nb.float32[:], nb.float32[:,:]),
+      nb.float64[:](nb.float64[:], nb.float64[:,:])],
+     nopython=True)
+def distance(xn, x):
+    """Distance of nodes to points"""
+    return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
 
-    @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:,:],
-         dtype, dtype, dtype),
-         nopython=True)
-    def nearest_2d(p1, p2, p3, point, v1, v2, v3):
-        """JIT optimized nearest neighbor interpolation for 2D element"""
-        values = (v1, v2, v3)
+@jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:], nb.float32[:,:],
+      nb.float32, nb.float32, nb.float32),
+      nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:], nb.float64[:,:],
+      nb.float64, nb.float64, nb.float64)],
+     nopython=True)
+def nearest_2d(p1, p2, p3, point, v1, v2, v3):
+    """JIT optimized nearest neighbor interpolation for 2D element"""
+    values = (v1, v2, v3)
 
-        dist = np.empty((3, point.shape[1]), dtype=dtype)
-        dist[0] = distance(p1, point)
-        dist[1] = distance(p2, point)
-        dist[2] = distance(p3, point)
+    dist = np.empty((3, point.shape[1]), dtype=point.dtype)
+    dist[0] = distance(p1, point)
+    dist[1] = distance(p2, point)
+    dist[2] = distance(p3, point)
 
-        nearest = np.empty(point.shape[1], dtype=dtype)
-        for j in range(dist.shape[1]):
-            nearest[j] = values[np.argmin(dist[:,j])]
+    nearest = np.empty(point.shape[1], dtype=point.dtype)
+    for j in range(dist.shape[1]):
+        nearest[j] = values[np.argmin(dist[:,j])]
 
-        return nearest
-    return nearest_2d
+    return nearest
 
 
 def make_3d_idw_jit(dtype):
@@ -387,30 +388,34 @@ def make_3d_idw_jit(dtype):
     return simple_3d
 
 
-def make_2d_idw_jit(dtype):
-    @jit(dtype[:](dtype[:], dtype[:,:]), nopython=True)
-    def distance(xn, x):
-        """Distance of nodes to points"""
-        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
+@jit([nb.float32[:](nb.float32[:], nb.float32[:,:]),
+      nb.float64[:](nb.float64[:], nb.float64[:,:])],
+     nopython=True)
+def distance(xn, x):
+    """Distance of nodes to points"""
+    return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
 
-    @jit(dtype[:](dtype[:], dtype[:,:], nb.int32), nopython=True)
-    def weight(xn, x, p):
-        """Weight of nodes to point"""
-        return 1 / distance(xn, x)**p
+@jit([nb.float32[:](nb.float32[:], nb.float32[:,:], nb.int32),
+      nb.float64[:](nb.float64[:], nb.float64[:,:], nb.int32)],
+     nopython=True)
+def weight(xn, x, p):
+    """Weight of nodes to point"""
+    return 1 / distance(xn, x)**p
 
-    @jit(dtype[:](dtype[:], dtype[:], dtype[:], dtype[:,:],
-         dtype, dtype, dtype, nb.int32),
-         nopython=True)
-    def simple_2d(p1, p2, p3, point, v1, v2, v3, power):
-        """Simple inverse distance weighting function"""
-        v_point = (v1*weight(p1, point, power) +
-                   v2*weight(p2, point, power) +
-                   v3*weight(p3, point, power)) / \
-                  (weight(p1, point, power) +
-                   weight(p2, point, power) +
-                   weight(p3, point, power))
-        return v_point
-    return simple_2d
+@jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:], nb.float32[:,:],
+      nb.float32, nb.float32, nb.float32, nb.int32),
+      nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:], nb.float64[:,:],
+      nb.float64, nb.float64, nb.float64, nb.int32)],
+     nopython=True)
+def idw_simple_2d(p1, p2, p3, point, v1, v2, v3, power):
+    """Simple inverse distance weighting function"""
+    v_point = (v1*weight(p1, point, power) +
+               v2*weight(p2, point, power) +
+               v3*weight(p3, point, power)) / \
+              (weight(p1, point, power) +
+               weight(p2, point, power) +
+               weight(p3, point, power))
+    return v_point
 
 
 # TODO: cuda functions are WIP
@@ -461,12 +466,6 @@ jit_functions['3d']['idw'][nb.float64] = make_3d_idw_jit(nb.float64)
 jit_functions['3d']['idw'][nb.float32] = make_3d_idw_jit(nb.float32)
 
 jit_functions['2d']= {}
-jit_functions['2d']['linear'] = {}
-jit_functions['2d']['linear'][nb.float64] = make_2d_lin_jit(nb.float64)
-jit_functions['2d']['linear'][nb.float32] = make_2d_lin_jit(nb.float32)
-jit_functions['2d']['idw'] = {}
-jit_functions['2d']['idw'][nb.float64] = make_2d_idw_jit(nb.float64)
-jit_functions['2d']['idw'][nb.float32] = make_2d_idw_jit(nb.float32)
-jit_functions['2d']['nearest'] = {}
-jit_functions['2d']['nearest'][nb.float64] = make_2d_nn_jit(nb.float64)
-jit_functions['2d']['nearest'][nb.float32] = make_2d_nn_jit(nb.float32)
+jit_functions['2d']['linear'] = linear_2d
+jit_functions['2d']['idw'] = idw_simple_2d
+jit_functions['2d']['nearest'] = nearest_2d
