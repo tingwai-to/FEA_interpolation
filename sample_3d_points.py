@@ -41,13 +41,14 @@ def speed_comparison():
              ('linear', 64, False), ('linear', 32, False),
              ('idw', 64, True), ('idw', 32, True),
              ('idw', 64, False), ('idw', 32, False),
-             # ('nearest', 64, True), ('nearest', 32, True),
+             ('nearest', 64, True), ('nearest', 32, True),
              ('nearest', 64, False), ('nearest', 32, False)]
 
-    Ns = np.array([8, 16, 32, 64, 128, 256])
+    Ns = np.array([8, 16, 32, 64, 128])
     times = np.empty((len(funcs), Ns.shape[0]))
 
     for i, N in enumerate(Ns):
+        print('N = %i' % N)
         x, y, z = np.mgrid[x_min:x_max:1j * N,
                            y_min:y_max:1j * N,
                            z_min:z_max:1j * N]

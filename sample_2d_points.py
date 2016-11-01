@@ -78,6 +78,7 @@ def speed_comparison():
     times = np.empty((len(funcs), Ns.shape[0]))
 
     for i, N in enumerate(Ns):
+        print('N = %i' % N)
         x, y = np.mgrid[x_min:x_max:1j*N,
                         y_min:y_max:1j*N]
         points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
@@ -141,6 +142,6 @@ def visualize_function():
     plt.savefig('output_2d.png')
 
 
-test_cuda()
-# speed_comparison()
+# test_cuda()
+speed_comparison()
 # visualize_function()
