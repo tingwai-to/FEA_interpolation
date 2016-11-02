@@ -139,12 +139,14 @@ def speed_comparison():
 def visualize_function():
     # Plot individual function
 
-    buff = triangle.linear_nojit(points_f64)
-    # buff_2d = triangle2d.sample('linear', points_f64, jit=False)
+    buff = triangle.sample('nearest', points_f32, jit=False)
+    buff_2d = triangle2d.sample('nearest', points_f32, jit=False)
     buff.shape = x.shape
+    buff_2d.shape = x.shape
+    diff = buff.T - buff_2d.T
 
     plt.figure()
-    plt.imshow(buff.T, extent=[x_min, x_max, y_min, y_max], origin='lower',
+    plt.imshow(diff, extent=[x_min, x_max, y_min, y_max], origin='lower',
                interpolation='nearest')
     plt.plot([p1[0], p2[0], p3[0], p1[0]], [p1[1], p2[1], p3[1], p1[1]], '-k')
     plt.colorbar()
@@ -155,15 +157,17 @@ def time_function():
     N=100
     start = time()
     for i in range(N):
-        buff_2d = triangle2d.linear_nojit(points_f64)
+        # Elem2D class
+        buff_2d = triangle2d.sample('nearest', points_f32, jit=False)
     end = time()
-    print('%i times took %.5f seconds' % (N, end-start))
+    print('Elem2D:  %i times took %.5f seconds' % (N, end-start))
 
     start = time()
     for i in range(N):
-        buff = triangle.linear_nojit(points_f64)
+        # Element class
+        buff = triangle.sample('nearest', points_f32, jit=False)
     end = time()
-    print('%i times took %.5f seconds' % (N, end-start))
+    print('Element: %i times took %.5f seconds' % (N, end-start))
 
 
 # test_cuda()
