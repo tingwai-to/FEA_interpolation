@@ -5,22 +5,63 @@ from numpy import sqrt
 from numba import jit
 from numba import cuda
 import numba as nb
+from math import factorial
 
 
 class Element(object):
-    def __init__(self):
-        raise NotImplementedError('Abstract class')
+    def __init__(self, nodes):
+        """
+        Args:
+            dim (int): dimensionality of element, derived from Node
+            nodes (Nodes): list of nodes
+            values (float): list of values in nodes
+        """
+        self.dim = nodes[0].dim
+        self.coords = [thisnode.coord for thisnode in nodes]
+        self.values = [thisnode.value for thisnode in nodes]
 
     def sample(self, method, point, *args, **kwargs):
         use_jit = kwargs.pop("jit", False)
         if use_jit:
-            func = jit_functions['%sd' % self.dimensionality][method]
+            func = jit_functions['%sd' % self.dim][method]
             return self._call_jit(func, point, *args, **kwargs)
         else:
             func = getattr(self, '%s_nojit' % method, None)
             if func is None:
                 raise AttributeError('No interpolation function called %s' % method)
             return func(point, *args, **kwargs)
+
+    def linear_nojit(self, point):
+        """Non-JIT linear interpolation for nD element"""
+        dtype = point.dtype
+
+        trans = np.empty((self.dim, self.dim), dtype=dtype)
+        for i in range(self.dim):
+            for j in range(self.dim):
+                trans[i,j] = self.coords[j+1][i]\
+                             - self.coords[0][i]
+        trans = npla.inv(trans)
+        ref_point = trans.dot(np.array(
+            [point[j]-self.coords[0][j] for j in range(self.dim)],
+            dtype=dtype))
+
+        tot_vol = np.array([1./factorial(self.dim)], dtype=dtype)
+        vols = []
+        for i in range(self.dim):
+            vols.append(np.array([tot_vol], dtype=dtype)*ref_point[i])
+        vols.insert(0, tot_vol - sum(vols))
+
+        v_point = sum([self.values[j]*vols[j]/tot_vol for j in range(self.dim+1)])
+
+        mask = np.ones_like(v_point, dtype="bool")
+        for v in vols:
+            mask &= (v/tot_vol) > 0
+            mask &= (v/tot_vol) < 1
+
+        v_point = np.ma.MaskedArray(v_point, ~mask)
+
+        return v_point#, mask
+
 
 
 class Elem3D(Element):

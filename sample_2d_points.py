@@ -1,3 +1,5 @@
+from node import Node
+from element import Element
 from node import Node2D
 from element import Elem2D
 import element
@@ -17,15 +19,28 @@ v1 = 1.
 v2 = 2.
 v3 = 3.
 
-node1 = Node2D(p1, v1)
-node2 = Node2D(p2, v2)
-node3 = Node2D(p3, v3)
-triangle = Elem2D(node1, node2, node3)
+node1 = Node(p1, v1)
+node2 = Node(p2, v2)
+node3 = Node(p3, v3)
+triangle = Element([node1, node2, node3])
+
+node1_2d = Node2D(p1, v1)
+node2_2d = Node2D(p2, v2)
+node3_2d = Node2D(p3, v3)
+triangle2d = Elem2D(node1_2d, node2_2d, node3_2d)
+
 
 x_min = min(_[0] for _ in (p1, p2, p3))
 y_min = min(_[1] for _ in (p1, p2, p3))
 x_max = max(_[0] for _ in (p1, p2, p3))
 y_max = max(_[1] for _ in (p1, p2, p3))
+
+N=128
+x, y = np.mgrid[x_min:x_max:1j*N,
+                y_min:y_max:1j*N]
+points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
+points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
+power = 128 # to exaggerate visualization of IDW
 
 
 def test_cuda():
@@ -123,15 +138,9 @@ def speed_comparison():
 
 def visualize_function():
     # Plot individual function
-    N=128
-    x, y = np.mgrid[x_min:x_max:1j*N,
-                    y_min:y_max:1j*N]
 
-    points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
-    points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
-
-    power = 128 # to exaggerate visualization of IDW
-    buff = triangle.sample('nearest', points_f64, jit=True)
+    buff = triangle.linear_nojit(points_f64)
+    # buff_2d = triangle2d.sample('linear', points_f64, jit=False)
     buff.shape = x.shape
 
     plt.figure()
@@ -142,6 +151,22 @@ def visualize_function():
     plt.savefig('output_2d.png')
 
 
+def time_function():
+    N=100
+    start = time()
+    for i in range(N):
+        buff_2d = triangle2d.linear_nojit(points_f64)
+    end = time()
+    print('%i times took %.5f seconds' % (N, end-start))
+
+    start = time()
+    for i in range(N):
+        buff = triangle.linear_nojit(points_f64)
+    end = time()
+    print('%i times took %.5f seconds' % (N, end-start))
+
+
 # test_cuda()
-speed_comparison()
-# visualize_function()
+# speed_comparison()
+visualize_function()
+time_function()
