@@ -139,8 +139,8 @@ def speed_comparison():
 def visualize_function():
     # Plot individual function
 
-    buff = triangle.sample('nearest', points_f32, jit=False)
-    buff_2d = triangle2d.sample('nearest', points_f32, jit=False)
+    buff = triangle.sample('linear', points_f32, jit=False)
+    buff_2d = triangle2d.sample('linear', points_f32, jit=False)
     buff.shape = x.shape
     buff_2d.shape = x.shape
     diff = buff.T - buff_2d.T

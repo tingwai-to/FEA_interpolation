@@ -14,10 +14,10 @@ class Element(object):
         self.dim = nodes[0].dim
 
         #: list of np.array: coordinates of nodes
-        self.coords = [thisnode.coord for thisnode in nodes]
+        self.coords = np.array([thisnode.coord for thisnode in nodes])
 
         #: list of float: values of nodes
-        self.values = [thisnode.value for thisnode in nodes]
+        self.values = np.array([thisnode.value for thisnode in nodes])
 
     def sample(self, method, point, *args, **kwargs):
         use_jit = kwargs.pop("jit", False)
@@ -33,15 +33,9 @@ class Element(object):
     def linear_nojit(self, point):
         """Non-JIT linear interpolation for nD element"""
         dtype = point.dtype
-
-        trans = np.empty((self.dim, self.dim), dtype=dtype)
-        for i in range(self.dim):
-            for j in range(self.dim):
-                trans[i,j] = self.coords[j+1][i] - self.coords[0][i]
+        trans = (self.coords[1:,:] - self.coords[0,:]).T
         trans = npla.inv(trans)
-        ref_point = trans.dot(np.array(
-            [point[j]-self.coords[0][j] for j in range(self.dim)],
-            dtype=dtype))
+        ref_point = trans.dot((point-self.coords[0,:][:,None]))
 
         tot_vol = np.array([1./factorial(self.dim)], dtype=dtype)
         vols = []
