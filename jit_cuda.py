@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 import numpy.linalg as npla
 import numba as nb
@@ -12,32 +13,35 @@ from time import time
                       nb.float64, nb.float64, nb.float64,
                       nb.float64[:,:]])
 def linear_2d_cuda(result, p1, point, v1, v2, v3, trans):
-    # Thread id in a 1D block
-    tx = cuda.threadIdx.x
-    # Block id in a 1D grid
-    ty = cuda.blockIdx.x
-    # Block width, i.e. number of threads per block
-    bw = cuda.blockDim.x
-    # Compute flattened index inside the array
-    pos = tx + ty * bw
+    for k in range(25):
+        # Thread id in a 1D block
+        tx = cuda.threadIdx.x
+        # Block id in a 1D grid
+        ty = cuda.blockIdx.x
+        # Block width, i.e. number of threads per block
+        bw = cuda.blockDim.x
+        # Compute flattened index inside the array
+        pos = tx + ty * bw
 
-    if pos < result.size:  # Check array boundaries
+        #if pos < result.size:  # Check array boundaries
         ref_point_x = trans[0,0]*(point[0,pos]-p1[0]) + \
                       trans[0,1]*(point[1,pos]-p1[0])
         ref_point_y = trans[1,0]*(point[0,pos]-p1[1]) + \
                       trans[1,1]*(point[1,pos]-p1[1])
-
         area2 = 0.5*ref_point_x
         area3 = 0.5*ref_point_y
         area1 = 0.5 - area2 - area3
 
-        if (area1/0.5) < 0 or (area1/0.5) > 1 or \
-           (area2/0.5) < 0 or (area2/0.5) > 1 or \
-           (area3/0.5) < 0 or (area3/0.5) > 1:
-            result[pos] = -1
-        else:
-            result[pos] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
+        # TODO: implement masking without if statements
+        #if (area1/0.5) < 0 or (area1/0.5) > 1 or \
+        #   (area2/0.5) < 0 or (area2/0.5) > 1 or \
+        #   (area3/0.5) < 0 or (area3/0.5) > 1:
+        #    result[pos] = -1
+        #else:
+        result[pos] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
 
+
+# TODO: 3d linear cuda
 
 p1 = np.array([2, 2], dtype='f8')
 p2 = np.array([4, 3], dtype='f8')
@@ -66,16 +70,16 @@ point = np.array([_.ravel() for _ in (x, y)], dtype='f8')
 point = point.reshape((N,N,2))
 result = np.empty((N**2), dtype='f8')
 
-ref_point_x = trans[0,0]*(point[0]-p1[0]) + trans[0,1]*(point[1]-p1[0])
-ref_point_y = trans[1,0]*(point[0]-p1[1]) + trans[1,1]*(point[1]-p1[1])
-
 
 # CUDA setup
 threadsperblock = 32
-blockspergrid = (result.size + (threadsperblock - 1))
-
+blockspergrid = (result.size + (threadsperblock - 1)) // threadsperblock
+linear_2d_cuda[blockspergrid, threadsperblock](result,
+                                               p1, point, v1, v2, v3, trans)
+print (blockspergrid, threadsperblock)
 start = time()
-linear_2d_cuda[blockspergrid, threadsperblock](
+for k in range(25):
+    linear_2d_cuda[blockspergrid, threadsperblock](
     result, p1, point, v1, v2, v3, trans)
 end = time()
 
