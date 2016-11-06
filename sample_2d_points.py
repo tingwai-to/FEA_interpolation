@@ -43,42 +43,6 @@ points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
 power = 128 # to exaggerate visualization of IDW
 
 
-def test_cuda():
-    p1 = triangle.p1
-    p2 = triangle.p2
-    p3 = triangle.p3
-    v1 = triangle.v1
-    v2 = triangle.v2
-    v3 = triangle.v3
-    N = 1024
-    x, y = np.mgrid[x_min:x_max:1j*N,
-                    y_min:y_max:1j*N]
-
-    trans = np.empty((2,2), dtype='f8')
-    trans[0,0] = p2[0] - p1[0]
-    trans[0,1] = p3[0] - p1[0]
-    trans[1,0] = p2[1] - p1[1]
-    trans[1,1] = p3[1] - p1[1]
-    trans = np.linalg.inv(trans)
-
-    point = np.array([_.ravel() for _ in (x, y)], dtype='f8')
-    point = point.reshape((N,N,2))
-    result = np.empty((N,N), dtype='f8')
-
-    start = time()
-    element.make_cuda[1,N](result, p1, p2, p3, point, v1, v2, v3, trans)
-    end = time()
-    print(end-start)
-    print(result)
-
-    plt.figure()
-    plt.imshow(result.T, extent=[x_min, x_max, y_min, y_max], origin='lower',
-               interpolation='nearest')
-    plt.plot([p1[0], p2[0], p3[0], p1[0]], [p1[1], p2[1], p3[1], p1[1]], '-k')
-    plt.colorbar()
-    plt.show()
-
-
 def speed_comparison():
     # JIT vs non-JIT
     fig, ax = plt.subplots()
@@ -139,8 +103,8 @@ def speed_comparison():
 def visualize_function():
     # Plot individual function
 
-    buff = triangle.sample('nearest', points_f32, jit=False)
-    buff_2d = triangle2d.sample('nearest', points_f32, jit=False)
+    buff = triangle.sample('nearest', points_f64, jit=False)
+    buff_2d = triangle2d.sample('nearest', points_f64, jit=False)
     buff.shape = x.shape
     buff_2d.shape = x.shape
     diff = buff.T - buff_2d.T
@@ -173,4 +137,4 @@ def time_function():
 # test_cuda()
 # speed_comparison()
 visualize_function()
-time_function()
+# time_function()
