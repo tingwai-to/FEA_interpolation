@@ -41,7 +41,47 @@ def linear_2d_cuda(result, p1, point, v1, v2, v3, trans):
             result[pos] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
 
 
-# TODO: 3d linear cuda
+@cuda.jit(argtypes = [nb.float64[:],
+                      nb.float64[:],
+                      nb.float64[:,:],
+                      nb.float64, nb.float64, nb.float64, nb.float64,
+                      nb.float64[:,:]])
+def linear_3d_cuda(result, p1, point, v1, v2, v3, v4, trans):
+    # Thread id in a 1D block
+    tx = cuda.threadIdx.x
+    # Block id in a 1D grid
+    ty = cuda.blockIdx.x
+    # Block width, i.e. number of threads per block
+    bw = cuda.blockDim.x
+    # Compute flattened index inside the array
+    pos = tx + ty * bw
+
+    if pos < result.size:  # Check array boundaries
+        ref_point_x = trans[0,0]*(point[0,pos]-p1[0]) + \
+                      trans[0,1]*(point[1,pos]-p1[0]) + \
+                      trans[0,2]*(point[2,pos]-p1[0])
+        ref_point_y = trans[1,0]*(point[0,pos]-p1[1]) + \
+                      trans[1,1]*(point[1,pos]-p1[1]) + \
+                      trans[1,2]*(point[2,pos]-p1[1])
+        ref_point_z = trans[2,0]*(point[0,pos]-p1[2]) + \
+                      trans[2,1]*(point[1,pos]-p1[2]) + \
+                      trans[2,2]*(point[2,pos]-p1[2])
+        vol2 = 1./6*ref_point_x
+        vol3 = 1./6*ref_point_y
+        vol4 = 1./6*ref_point_z
+        vol1 = 1./6 - vol2 - vol3 - vol4
+
+        # if vol1/(1./6) < 0 or \
+        #    vol1/(1./6) > 1 or \
+        #    vol2/(1./6) > 0 or \
+        #    vol2/(1./6) > 1 or \
+        #    vol3/(1./6) > 0 or \
+        #    vol3/(1./6) > 1:
+        #     result[pos] = -1
+        # else:
+        result[pos] = v1*(vol1/(1./6)) + v2*(vol2/(1./6)) + \
+                      v3*(vol3/(1./6)) + v4*(vol4/(1./6))
+
 
 p1 = np.array([2, 2], dtype='f8')
 p2 = np.array([4, 3], dtype='f8')
