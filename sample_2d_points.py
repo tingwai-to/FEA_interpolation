@@ -19,11 +19,13 @@ v1 = 1.
 v2 = 2.
 v3 = 3.
 
+# n-dim
 node1 = Node(p1, v1)
 node2 = Node(p2, v2)
 node3 = Node(p3, v3)
 triangle = Element([node1, node2, node3])
 
+# 2-dim
 node1_2d = Node2D(p1, v1)
 node2_2d = Node2D(p2, v2)
 node3_2d = Node2D(p3, v3)
@@ -38,8 +40,8 @@ y_max = max(_[1] for _ in (p1, p2, p3))
 N=128
 x, y = np.mgrid[x_min:x_max:1j*N,
                 y_min:y_max:1j*N]
-points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
-points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
+points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8').T
+points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f').T
 power = 128 # to exaggerate visualization of IDW
 
 
@@ -103,8 +105,8 @@ def speed_comparison():
 def visualize_function():
     # Plot individual function
 
-    buff = triangle.sample('nearest', points_f64, jit=False)
-    buff_2d = triangle2d.sample('nearest', points_f64, jit=False)
+    buff = triangle.sample('linear', points_f64, jit=False)
+    buff_2d = triangle2d.sample('linear', points_f64.T, jit=False)
     buff.shape = x.shape
     buff_2d.shape = x.shape
     diff = buff.T - buff_2d.T
@@ -134,7 +136,6 @@ def time_function():
     print('Element: %i times took %.5f seconds' % (N, end-start))
 
 
-# test_cuda()
 # speed_comparison()
 visualize_function()
 # time_function()

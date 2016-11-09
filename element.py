@@ -35,17 +35,16 @@ class Element(object):
         dtype = point.dtype
         trans = (self.coords[1:,:] - self.coords[0,:]).T
         trans = npla.inv(trans)
-        ref_point = trans.dot((point-self.coords[0,:][:,None]))
+        ref_point = trans.dot((point-self.coords[0]).T).T
 
         tot_vol = np.array([1./factorial(self.dim)], dtype=dtype)
         vols = []
-        for i in range(self.dim):
-            vols.append(np.array([tot_vol], dtype=dtype)*ref_point[i])
+        for j in range(self.dim):
+            vols.append(tot_vol*ref_point[:,j])
         vols.insert(0, tot_vol - sum(vols))
 
-        v_point = 0
-        for j in range(self.dim+1):
-            v_point += self.values[j]*vols[j]/tot_vol
+        v_point = self.values*np.array(vols).T/tot_vol
+        v_point = np.sum(v_point, axis=1)
 
         mask = np.ones_like(v_point, dtype="bool")
         for v in vols:
