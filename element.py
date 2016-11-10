@@ -71,19 +71,15 @@ class Element(object):
 
     def nearest_nojit(self, point):
         """Non-JIT nearest neighbor for nD element"""
-        dtype = point.dtype
+        dist = self._distance(point)
 
-        dist = np.empty((self.dim+1, point.shape[1]), dtype=dtype)
-        for i in range(self.dim+1):
-            dist[i] = self._distance(self.coords[i], point)
-
-        nearest = np.empty(point.shape[1], dtype=dtype)
-        for j in range(dist.shape[1]):
-            nearest[j] = self.values[np.argmin(dist[:,j])]
+        nearest_index = np.argmin(dist, axis=0)
+        nearest = self.values[nearest_index]
 
         return nearest
 
     def _distance(self, point):
+        """Returns distance between each pair of coords and points"""
         return cdist(self.coords, point)
 
 
