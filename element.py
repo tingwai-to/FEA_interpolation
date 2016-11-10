@@ -5,22 +5,82 @@ from numpy import sqrt
 from numba import jit
 from numba import cuda
 import numba as nb
+from math import factorial
+from scipy.spatial.distance import cdist
 
 
 class Element(object):
-    def __init__(self):
-        raise NotImplementedError('Abstract class')
+    def __init__(self, nodes):
+        #: int: dimensionality of element, derived from Node
+        self.dim = nodes[0].dim
+
+        #: list of np.array: coordinates of nodes
+        self.coords = np.array([thisnode.coord for thisnode in nodes])
+
+        #: list of float: values of nodes
+        self.values = np.array([thisnode.value for thisnode in nodes])
 
     def sample(self, method, point, *args, **kwargs):
         use_jit = kwargs.pop("jit", False)
         if use_jit:
-            func = jit_functions['%sd' % self.dimensionality][method]
+            func = jit_functions['%sd' % self.dim][method]
             return self._call_jit(func, point, *args, **kwargs)
         else:
             func = getattr(self, '%s_nojit' % method, None)
             if func is None:
                 raise AttributeError('No interpolation function called %s' % method)
             return func(point, *args, **kwargs)
+
+    def linear_nojit(self, point):
+        """Non-JIT linear interpolation for nD element"""
+        dtype = point.dtype
+        trans = (self.coords[1:,:] - self.coords[0,:]).T
+        trans = npla.inv(trans)
+        ref_point = trans.dot((point-self.coords[0]).T).T
+
+        tot_vol = np.array([1./factorial(self.dim)], dtype=dtype)
+        vols = []
+        for j in range(self.dim):
+            vols.append(tot_vol*ref_point[:,j])
+        vols.insert(0, tot_vol - sum(vols))
+
+        v_point = self.values*np.array(vols).T/tot_vol
+        v_point = np.sum(v_point, axis=1)
+
+        mask = np.ones_like(v_point, dtype="bool")
+        for v in vols:
+            mask &= (v/tot_vol) > 0
+            mask &= (v/tot_vol) < 1
+
+        v_point = np.ma.MaskedArray(v_point, ~mask)
+
+        return v_point#, mask
+
+    def idw_nojit(self, point, power=2):
+        """Non-JIT simple inverse distance weighting for nD element"""
+        def weight(point, p):
+            return 1 / self._distance(point)**p
+
+        weighted_distances = weight(point, power)
+        numerator = np.sum(self.values[:,None]*weighted_distances, axis=0)
+        denominator =  np.sum(weighted_distances, axis=0)
+        v_point = numerator/denominator
+
+        return v_point
+
+
+    def nearest_nojit(self, point):
+        """Non-JIT nearest neighbor for nD element"""
+        dist = self._distance(point)
+
+        nearest_index = np.argmin(dist, axis=0)
+        nearest = self.values[nearest_index]
+
+        return nearest
+
+    def _distance(self, point):
+        """Returns distance between each pair of coords and points"""
+        return cdist(self.coords, point)
 
 
 class Elem3D(Element):
@@ -80,10 +140,10 @@ class Elem3D(Element):
             return 1 / self._distance(xn,x)**p
 
         dtype = point.dtype
-        p1 = self.p1.astype(dtype)
-        p2 = self.p2.astype(dtype)
-        p3 = self.p3.astype(dtype)
-        p4 = self.p4.astype(dtype)
+        p1 = self.p1
+        p2 = self.p2
+        p3 = self.p3
+        p4 = self.p4
         v1 = self.v1
         v2 = self.v2
         v3 = self.v3
@@ -126,10 +186,7 @@ class Elem3D(Element):
 
     def _call_jit(self, func, point, *args, **kwargs):
         dtype = point.dtype
-        return func(self.p1.astype(dtype),
-                    self.p2.astype(dtype),
-                    self.p3.astype(dtype),
-                    self.p4.astype(dtype),
+        return func(self.p1, self.p2, self.p3, self.p4,
                     point,
                     self.v1, self.v2, self.v3, self.v4, *args, **kwargs)
 
@@ -187,9 +244,9 @@ class Elem2D(Element):
             return 1 / self._distance(xn, x) ** p
 
         dtype = point.dtype
-        p1 = self.p1.astype(dtype)
-        p2 = self.p2.astype(dtype)
-        p3 = self.p3.astype(dtype)
+        p1 = self.p1
+        p2 = self.p2
+        p3 = self.p3
         v1 = self.v1
         v2 = self.v2
         v3 = self.v3
@@ -225,12 +282,10 @@ class Elem2D(Element):
         return nearest
 
     def _call_jit(self, func, point, *args, **kwargs):
-            dtype = point.dtype
-            return func(self.p1.astype(dtype),
-                        self.p2.astype(dtype),
-                        self.p3.astype(dtype),
-                        point,
-                        self.v1, self.v2, self.v3, *args, **kwargs)
+        dtype = point.dtype
+        return func(self.p1, self.p2, self.p3,
+                    point,
+                    self.v1, self.v2, self.v3, *args, **kwargs)
 
     @staticmethod
     def _distance(xn, x):

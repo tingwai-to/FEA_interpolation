@@ -1,3 +1,5 @@
+from node import Node
+from element import Element
 from node import Node3D
 from element import Elem3D
 import element
@@ -20,11 +22,19 @@ v2 = 2.2
 v3 = 3.4
 v4 = 4.6
 
+# n-dim
+node1 = Node(p1, v1)
+node2 = Node(p2, v2)
+node3 = Node(p3, v3)
+node4 = Node(p4, v4)
+triangle = Element([node1, node2, node3, node4])
+
+# 3-dim
 node1 = Node3D(p1, v1)
 node2 = Node3D(p2, v2)
 node3 = Node3D(p3, v3)
 node4 = Node3D(p4, v4)
-triangle = Elem3D(node1, node2, node3, node4)
+triangle3d = Elem3D(node1, node2, node3, node4)
 
 x_min = min(_[0] for _ in (p1, p2, p3, p4))
 y_min = min(_[1] for _ in (p1, p2, p3, p4))
@@ -32,6 +42,14 @@ z_min = min(_[2] for _ in (p1, p2, p3, p4))
 x_max = max(_[0] for _ in (p1, p2, p3, p4))
 y_max = max(_[1] for _ in (p1, p2, p3, p4))
 z_max = max(_[2] for _ in (p1, p2, p3, p4))
+
+N=128
+x, y, z = np.mgrid[x_min:x_max:1j*N,
+                   y_min:y_max:1j*N,
+                   z_min:z_max:1j*N]
+
+points_f64 = np.array([_.ravel() for _ in (x, y, z)], dtype="f8").T
+points_f32 = np.array([_.ravel() for _ in (x, y, z)], dtype="f").T
 
 
 def speed_comparison():
@@ -92,20 +110,20 @@ def speed_comparison():
     plt.savefig("3d_speed_comparison_rel.png")
 
 
-def visualize_function():
-    # Plot individual function
-    N=128
-    x, y, z = np.mgrid[x_min:x_max:1j*N,
-                       y_min:y_max:1j*N,
-                       z_min:z_max:1j*N]
-
-    points_f64 = np.array([_.ravel() for _ in (x, y, z)], dtype="f8")
-    points_f32 = np.array([_.ravel() for _ in (x, y, z)], dtype="f")
-
-    buff = triangle.sample('nearest', points_f64)
+def diff_triangles():
+    buff = triangle.sample('linear', points_f64, jit=False)
+    buff_3d = triangle3d.sample('linear', points_f64.T, jit=False)
     buff.shape = x.shape
-    # mask.shape = x.shape
-    # buffer = np.ma.MaskedArray(buff, ~mask).transpose()
+    buff_3d.shape = x.shape
+    diff = buff.T - buff_3d.T
+
+    print(np.sum(diff))
+
+def slice_visualization():
+    # Slice 3d visualization
+
+    buff = triangle.sample('nearest', points_f64, jit=False)
+    buff.shape = x.shape
 
     if not os.path.isdir("frames3d"):
         os.mkdir("frames3d")
@@ -135,5 +153,6 @@ def visualize_function():
         plt.savefig("frames/slice_z_%03i.png" % i)
 
 
-speed_comparison()
-# visualize_function()
+# speed_comparison()
+# slice_visualization()
+diff_triangles()
