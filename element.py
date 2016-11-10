@@ -6,6 +6,7 @@ from numba import jit
 from numba import cuda
 import numba as nb
 from math import factorial
+from scipy.spatial.distance import cdist
 
 
 class Element(object):
@@ -57,19 +58,16 @@ class Element(object):
 
     def idw_nojit(self, point, power=2):
         """Non-JIT simple inverse distance weighting for nD element"""
-        def weight(xn, x, p):
-            return 1 / self._distance(xn,x)**p
+        def weight(point, p):
+            return 1 / self._distance(point)**p
 
-        total_values = 0
-        total_weight = 0
-        for i in range(self.dim+1):
-            this_weight = weight(self.coords[i], point, power)
-            total_values += self.values[i] * this_weight
-            total_weight += this_weight
-
-        v_point = total_values / total_weight
+        weighted_distances = weight(point, power)
+        numerator = np.sum(self.values[:,None]*weighted_distances, axis=0)
+        denominator =  np.sum(weighted_distances, axis=0)
+        v_point = numerator/denominator
 
         return v_point
+
 
     def nearest_nojit(self, point):
         """Non-JIT nearest neighbor for nD element"""
@@ -85,13 +83,8 @@ class Element(object):
 
         return nearest
 
-    def _distance(self, xn, x):
-        """
-        Args:
-            xn: coordinates of nodes
-            x: coordinates of points
-=        """
-        return sqrt(sum((xn[i]-x[i])**2 for i in range(self.dim)))
+    def _distance(self, point):
+        return cdist(self.coords, point)
 
 
 class Elem3D(Element):
