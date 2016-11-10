@@ -111,8 +111,8 @@ def speed_comparison():
 
 
 def diff_triangles():
-    buff = triangle.sample('idw', points_f64, jit=False)
-    buff_3d = triangle3d.sample('idw', points_f64.T, jit=False)
+    buff = triangle.sample('linear', points_f64, jit=False)
+    buff_3d = triangle3d.sample('linear', points_f64.T, jit=False)
     buff.shape = x.shape
     buff_3d.shape = x.shape
     diff = buff.T - buff_3d.T

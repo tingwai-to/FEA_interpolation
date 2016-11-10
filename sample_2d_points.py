@@ -31,7 +31,6 @@ node2_2d = Node2D(p2, v2)
 node3_2d = Node2D(p3, v3)
 triangle2d = Elem2D(node1_2d, node2_2d, node3_2d)
 
-
 x_min = min(_[0] for _ in (p1, p2, p3))
 y_min = min(_[1] for _ in (p1, p2, p3))
 x_max = max(_[0] for _ in (p1, p2, p3))
@@ -44,7 +43,6 @@ points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8').T
 points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f').T
 power = 128 # to exaggerate visualization of IDW
 
-# triangle._dist()
 
 def speed_comparison():
     # JIT vs non-JIT
@@ -106,8 +104,8 @@ def speed_comparison():
 def visualize_function():
     # Plot individual function
 
-    buff = triangle.sample('nearest', points_f64, jit=False)
-    buff_2d = triangle2d.sample('nearest', points_f64.T, jit=False)
+    buff = triangle.sample('linear', points_f64, jit=False)
+    buff_2d = triangle2d.sample('linear', points_f64.T, jit=False)
     buff.shape = x.shape
     buff_2d.shape = x.shape
     diff = buff.T - buff_2d.T
