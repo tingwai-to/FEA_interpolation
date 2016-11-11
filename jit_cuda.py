@@ -8,37 +8,45 @@ from time import time
 
 
 @cuda.jit(argtypes = [nb.float64[:],
-                      nb.float64[:],
+                      nb.float64[:], nb.float64[:], nb.float64[:],
                       nb.float64[:,:],
-                      nb.float64, nb.float64, nb.float64,
-                      nb.float64[:,:]])
-def linear_2d_cuda(result, p1, point, v1, v2, v3, trans):
-    for k in range(1):
-        # Thread id in a 1D block
-        tx = cuda.threadIdx.x
-        # Block id in a 1D grid
-        ty = cuda.blockIdx.x
-        # Block width, i.e. number of threads per block
-        bw = cuda.blockDim.x
-        # Compute flattened index inside the array
-        pos = tx + ty * bw
+                      nb.float64, nb.float64, nb.float64],
+          target = 'gpu')
+def linear_2d_cuda(result, p1, p2, p3, point, v1, v2, v3):
+    # Thread id in a 1D block
+    tx = cuda.threadIdx.x
+    # Block id in a 1D grid
+    ty = cuda.blockIdx.x
+    # Block width, i.e. number of threads per block
+    bw = cuda.blockDim.x
+    # Compute flattened index inside the array
+    pos = tx + ty * bw
 
-        if pos < result.size:  # Check array boundaries
-            ref_point_x = trans[0,0]*(point[0,pos]-p1[0]) + \
-                          trans[0,1]*(point[1,pos]-p1[0])
-            ref_point_y = trans[1,0]*(point[0,pos]-p1[1]) + \
-                          trans[1,1]*(point[1,pos]-p1[1])
-            area2 = 0.5*ref_point_x
-            area3 = 0.5*ref_point_y
-            area1 = 0.5 - area2 - area3
+    trans = cuda.shared.array(shape=(2,2), dtype=nb.float64)
+    trans[0,0] = p2[0] - p1[0]
+    trans[0,1] = p3[0] - p1[0]
+    trans[1,0] = p2[1] - p1[1]
+    trans[1,1] = p3[1] - p1[1]
+    # TODO: invert matrix not supported
+    # trans = npla.inv(trans)
 
-            # TODO: implement masking without if statements
-            #if (area1/0.5) < 0 or (area1/0.5) > 1 or \
-            #   (area2/0.5) < 0 or (area2/0.5) > 1 or \
-            #   (area3/0.5) < 0 or (area3/0.5) > 1:
-            #    result[pos] = -1
-            #else:
-            result[pos] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
+
+    if pos < result.size:  # Check array boundaries
+        ref_point_x = trans[0,0]*(point[0,pos]-p1[0]) + \
+                      trans[0,1]*(point[1,pos]-p1[0])
+        ref_point_y = trans[1,0]*(point[0,pos]-p1[1]) + \
+                      trans[1,1]*(point[1,pos]-p1[1])
+        area2 = 0.5*ref_point_x
+        area3 = 0.5*ref_point_y
+        area1 = 0.5 - area2 - area3
+
+        # TODO: implement masking without if statements
+        #if (area1/0.5) < 0 or (area1/0.5) > 1 or \
+        #   (area2/0.5) < 0 or (area2/0.5) > 1 or \
+        #   (area3/0.5) < 0 or (area3/0.5) > 1:
+        #    result[pos] = -1
+        #else:
+        result[pos] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
 
 
 @cuda.jit(argtypes = [nb.float64[:],
@@ -98,28 +106,19 @@ y_max = max(_[1] for _ in (p1, p2, p3))
 N = 1024
 x, y = np.mgrid[x_min:x_max:1j*N,
                 y_min:y_max:1j*N]
-
-trans = np.empty((2,2), dtype='f8')
-trans[0,0] = p2[0] - p1[0]
-trans[0,1] = p3[0] - p1[0]
-trans[1,0] = p2[1] - p1[1]
-trans[1,1] = p3[1] - p1[1]
-trans = npla.inv(trans)
-
 point = np.array([_.ravel() for _ in (x, y)], dtype='f8')
-point = point.reshape((N,N,2))
 
 
 ## CUDA setup
 # Allocate empty device ndarray
 d_result = cuda.device_array((N**2), dtype='f8')
-
 threadsperblock = 32
 blockspergrid = (d_result.size + (threadsperblock - 1)) // threadsperblock
 print (blockspergrid, threadsperblock)
+
 start = time()
-linear_2d_cuda[blockspergrid, threadsperblock](d_result,
-                                               p1, point, v1, v2, v3, trans)
+linear_2d_cuda[blockspergrid, threadsperblock]\
+    (d_result, p1, p2, p3, point, v1, v2, v3)
 end = time()
 print(end-start)
 
