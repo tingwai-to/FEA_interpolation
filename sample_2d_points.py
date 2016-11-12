@@ -47,12 +47,13 @@ power = 128 # to exaggerate visualization of IDW
 def speed_comparison():
     # JIT vs non-JIT
     fig, ax = plt.subplots()
-    funcs = [('linear', 64, True), ('linear', 32, True),
-             ('linear', 64, False), ('linear', 32, False),
-             ('idw', 64, True), ('idw', 32, True),
-             ('idw', 64, False), ('idw', 32, False),
-             ('nearest', 64, True), ('nearest', 32, True),
-             ('nearest', 64, False), ('nearest', 32, False)]
+    funcs = [('linear', 64, True), #('linear', 32, True),
+             ('linear', 64, False), #('linear', 32, False),
+             ('idw', 64, True), #('idw', 32, True),
+             ('idw', 64, False), #('idw', 32, False),
+             ('nearest', 64, True), #('nearest', 32, True),
+             ('nearest', 64, False), ('nearest', 32, False)#
+             ]
 
     Ns = np.array([8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096])
     times = np.empty((len(funcs), Ns.shape[0]))
@@ -61,18 +62,14 @@ def speed_comparison():
         print('N = %i' % N)
         x, y = np.mgrid[x_min:x_max:1j*N,
                         y_min:y_max:1j*N]
-        points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8')
-        points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f')
+        points_f64 = np.array([_.ravel() for _ in (x, y)], dtype='f8').T
+        points_f32 = np.array([_.ravel() for _ in (x, y)], dtype='f').T
 
         for j, fun in enumerate(funcs):
-            if fun[0] == 'idw':
-                start = time()
-                triangle.sample(fun[0], eval('points_f%s' % fun[1]), jit=fun[2], power=2)
-                end = time()
-            else:
-                start = time()
-                triangle.sample(fun[0], eval('points_f%s' % fun[1]), jit=fun[2])
-                end = time()
+            print(fun)
+            start = time()
+            triangle.sample(fun[0], eval('points_f%s' % fun[1]), jit=fun[2])
+            end = time()
             times[j, i] = end-start
 
     colors = cm.nipy_spectral(np.linspace(0, 1, len(funcs)))
@@ -104,11 +101,13 @@ def speed_comparison():
 def visualize_function():
     # Plot individual function
 
-    buff = triangle.sample('linear', points_f64, jit=False)
-    buff_2d = triangle2d.sample('linear', points_f64.T, jit=False)
+    buff = triangle.sample('nearest', points_f64, jit=True)
+    buff_nojit = triangle.sample('nearest', points_f64, jit=False)
+    # buff_2d = triangle2d.sample('linear', points_f64.T, jit=True)
     buff.shape = x.shape
-    buff_2d.shape = x.shape
-    diff = buff.T - buff_2d.T
+    buff_nojit.shape = x.shape
+    # buff_2d.shape = x.shape
+    diff = buff.T - buff_nojit.T
 
     plt.figure()
     plt.imshow(diff, extent=[x_min, x_max, y_min, y_max], origin='lower',

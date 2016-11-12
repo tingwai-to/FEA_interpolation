@@ -13,10 +13,8 @@ class Element(object):
     def __init__(self, nodes):
         #: int: dimensionality of element, derived from Node
         self.dim = nodes[0].dim
-
         #: list of np.array: coordinates of nodes
         self.coords = np.array([thisnode.coord for thisnode in nodes])
-
         #: list of float: values of nodes
         self.values = np.array([thisnode.value for thisnode in nodes])
 
@@ -24,12 +22,27 @@ class Element(object):
         use_jit = kwargs.pop("jit", False)
         if use_jit:
             func = jit_functions['%sd' % self.dim][method]
+            if method == 'idw':
+                kwargs['power'] = kwargs.get('power', 2)
             return self._call_jit(func, point, *args, **kwargs)
         else:
             func = getattr(self, '%s_nojit' % method, None)
             if func is None:
                 raise AttributeError('No interpolation function called %s' % method)
             return func(point, *args, **kwargs)
+
+    def _call_jit(self, func, point, *args, **kwargs):
+        dtype = point.dtype
+        if self.dim == 2:
+            return func(self.coords[0], self.coords[1], self.coords[2],
+                        point,
+                        self.values[0], self.values[1], self.values[2],
+                        *args, **kwargs)
+        if self.dim == 3:
+            return func(self.coords[0], self.coords[1], self.coords[2], self.coords[3],
+                        point,
+                        self.values[0], self.values[1], self.values[2], self.values[3],
+                        *args, **kwargs)
 
     def linear_nojit(self, point):
         """Non-JIT linear interpolation for nD element"""
@@ -67,7 +80,6 @@ class Element(object):
         v_point = numerator/denominator
 
         return v_point
-
 
     def nearest_nojit(self, point):
         """Non-JIT nearest neighbor for nD element"""
@@ -314,18 +326,18 @@ def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
     trans[2,2] = p4[2]-p1[2]
     trans = npla.inv(trans)
 
-    v_point = np.empty(point.shape[1], dtype=point.dtype)
-    for j in range(point.shape[1]):
+    v_point = np.empty(point.shape[0], dtype=point.dtype)
+    for i in range(point.shape[0]):
         # Transform points to new space
-        ref_point_x = trans[0,0]*(point[0,j]-p1[0]) + \
-                      trans[0,1]*(point[1,j]-p1[0]) + \
-                      trans[0,2]*(point[2,j]-p1[0])
-        ref_point_y = trans[1,0]*(point[0,j]-p1[1]) + \
-                      trans[1,1]*(point[1,j]-p1[1]) + \
-                      trans[1,2]*(point[2,j]-p1[1])
-        ref_point_z = trans[2,0]*(point[0,j]-p1[2]) + \
-                      trans[2,1]*(point[1,j]-p1[2]) + \
-                      trans[2,2]*(point[2,j]-p1[2])
+        ref_point_x = trans[0,0]*(point[i,0]-p1[0]) + \
+                      trans[0,1]*(point[i,1]-p1[0]) + \
+                      trans[0,2]*(point[i,2]-p1[0])
+        ref_point_y = trans[1,0]*(point[i,0]-p1[1]) + \
+                      trans[1,1]*(point[i,1]-p1[1]) + \
+                      trans[1,2]*(point[i,2]-p1[1])
+        ref_point_z = trans[2,0]*(point[i,0]-p1[2]) + \
+                      trans[2,1]*(point[i,1]-p1[2]) + \
+                      trans[2,2]*(point[i,2]-p1[2])
         vol2 = 1./6*ref_point_x
         vol3 = 1./6*ref_point_y
         vol4 = 1./6*ref_point_z
@@ -337,9 +349,9 @@ def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
            vol2/(1./6) > 1 or \
            vol3/(1./6) > 0 or \
            vol3/(1./6) > 1:
-            v_point[j] = -1
+            v_point[i] = -1
         else:
-            v_point[j] = v1*(vol1/(1./6)) + v2*(vol2/(1./6)) + \
+            v_point[i] = v1*(vol1/(1./6)) + v2*(vol2/(1./6)) + \
                          v3*(vol3/(1./6)) + v4*(vol4/(1./6))
 
     # mask = np.ones_like(v_point, dtype=nb.uint8)
@@ -367,13 +379,13 @@ def linear_2d(p1, p2, p3, point, v1, v2, v3):
     trans[1,1] = p3[1] - p1[1]
     trans = npla.inv(trans)
 
-    v_point = np.empty(point.shape[1], dtype=point.dtype)
-    for j in range(point.shape[1]):
+    v_point = np.empty(point.shape[0], dtype=point.dtype)
+    for i in range(point.shape[0]):
         # Transform points to new space
-        ref_point_x = trans[0,0]*(point[0,j]-p1[0]) + \
-                      trans[0,1]*(point[1,j]-p1[0])
-        ref_point_y = trans[1,0]*(point[0,j]-p1[1]) + \
-                      trans[1,1]*(point[1,j]-p1[1])
+        ref_point_x = trans[0,0]*(point[i,0]-p1[0]) + \
+                      trans[0,1]*(point[i,1]-p1[0])
+        ref_point_y = trans[1,0]*(point[i,0]-p1[1]) + \
+                      trans[1,1]*(point[i,1]-p1[1])
         area2 = 0.5*ref_point_x
         area3 = 0.5*ref_point_y
         area1 = 0.5 - area2 - area3
@@ -384,9 +396,9 @@ def linear_2d(p1, p2, p3, point, v1, v2, v3):
            (area2/0.5) > 1 or \
            (area3/0.5) < 0 or \
            (area3/0.5) > 1:
-            v_point[j] = -1
+            v_point[i] = -1
         else:
-            v_point[j] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
+            v_point[i] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
 
     return v_point
 
@@ -396,7 +408,7 @@ def linear_2d(p1, p2, p3, point, v1, v2, v3):
      nopython=True)
 def distance_3d(xn, x):
     """Distance of nodes to points"""
-    return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2 + (xn[2]-x[2])**2)
+    return sqrt((xn[0]-x[:,0])**2 + (xn[1]-x[:,1])**2 + (xn[2]-x[:,2])**2)
 
 
 @jit([nb.float32[:](nb.float32[:], nb.float32[:,:]),
@@ -404,7 +416,7 @@ def distance_3d(xn, x):
      nopython=True)
 def distance_2d(xn, x):
     """Distance of nodes to points"""
-    return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
+    return sqrt((xn[0]-x[:,0])**2 + (xn[1]-x[:,1])**2)
 
 
 @jit([nb.float32[:](nb.float32[:], nb.float32[:,:], nb.int32),
@@ -434,13 +446,13 @@ def nearest_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
     """JIT optimized nearest neighbor interpolation for 2D element"""
     values = (v1, v2, v3, v4)
 
-    dist = np.empty((4, point.shape[1]), dtype=point.dtype)
+    dist = np.empty((4, point.shape[0]), dtype=point.dtype)
     dist[0] = distance_2d(p1, point)
     dist[1] = distance_2d(p2, point)
     dist[2] = distance_2d(p3, point)
     dist[3] = distance_2d(p4, point)
 
-    nearest = np.empty(point.shape[1], dtype=point.dtype)
+    nearest = np.empty(point.shape[0], dtype=point.dtype)
     for j in range(dist.shape[1]):
         nearest[j] = values[np.argmin(dist[:,j])]
 
@@ -458,12 +470,12 @@ def nearest_2d(p1, p2, p3, point, v1, v2, v3):
     """JIT optimized nearest neighbor interpolation for 2D element"""
     values = (v1, v2, v3)
 
-    dist = np.empty((3, point.shape[1]), dtype=point.dtype)
+    dist = np.empty((3, point.shape[0]), dtype=point.dtype)
     dist[0] = distance_2d(p1, point)
     dist[1] = distance_2d(p2, point)
     dist[2] = distance_2d(p3, point)
 
-    nearest = np.empty(point.shape[1], dtype=point.dtype)
+    nearest = np.empty(point.shape[0], dtype=point.dtype)
     for j in range(dist.shape[1]):
         nearest[j] = values[np.argmin(dist[:,j])]
 
