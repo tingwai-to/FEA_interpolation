@@ -66,6 +66,7 @@ class Element(object):
             mask &= (v/tot_vol) < 1
 
         v_point = np.ma.MaskedArray(v_point, ~mask)
+        v_point = v_point.filled(fill_value=-1.)
 
         return v_point#, mask
 
@@ -93,215 +94,6 @@ class Element(object):
     def _distance(self, point):
         """Returns distance between each pair of coords and points"""
         return cdist(self.coords, point)
-
-
-class Elem3D(Element):
-    dimensionality = 3
-    def __init__(self, node1, node2, node3, node4):
-        self.p1 = node1.coord
-        self.p2 = node2.coord
-        self.p3 = node3.coord
-        self.p4 = node4.coord
-        self.v1 = node1.value
-        self.v2 = node2.value
-        self.v3 = node3.value
-        self.v4 = node4.value
-
-    def linear_nojit(self, point):
-        """Non-JIT linear interpolation for 3D element"""
-        dtype = point.dtype
-        p1 = self.p1
-        p2 = self.p2
-        p3 = self.p3
-        p4 = self.p4
-        v1 = self.v1
-        v2 = self.v2
-        v3 = self.v3
-        v4 = self.v4
-
-        trans = np.array([[p2[0]-p1[0], p3[0]-p1[0], p4[0]-p1[0]],
-                          [p2[1]-p1[1], p3[1]-p1[1], p4[1]-p1[1]],
-                          [p2[2]-p1[2], p3[2]-p1[2], p4[2]-p1[2]]],
-                         dtype=dtype)
-        trans = npla.inv(trans)
-
-        ref_point = trans.dot(np.array([point[0]-p1[0],
-                                        point[1]-p1[1],
-                                        point[2]-p1[2]],
-                                       dtype=dtype))
-
-        tot_vol = np.array([1./6], dtype=dtype)  # Volume of tetrahedron
-        vol2 = np.array([(1./3)*(1./2)], dtype=dtype)*ref_point[0]
-        vol3 = np.array([(1./3)*(1./2)], dtype=dtype)*ref_point[1]
-        vol4 = np.array([(1./3)*(1./2)], dtype=dtype)*ref_point[2]
-        vol1 = tot_vol - vol2 - vol3 - vol4
-
-        v_point = v1*(vol1/tot_vol) + v2*(vol2/tot_vol) + \
-                  v3*(vol3/tot_vol) + v4*(vol4/tot_vol)
-
-        # mask = np.ones_like(v_point, dtype="bool")
-        # for v in [vol1, vol2, vol3, vol4]:
-        #     mask &= (v/tot_vol) > 0
-        #     mask &= (v/tot_vol) < 1
-
-        return v_point#, mask
-
-    def idw_nojit(self, point, power=2):
-        """Non-JIT simple inverse distance weighting"""
-        def weight(xn, x, p):
-            return 1 / self._distance(xn,x)**p
-
-        dtype = point.dtype
-        p1 = self.p1
-        p2 = self.p2
-        p3 = self.p3
-        p4 = self.p4
-        v1 = self.v1
-        v2 = self.v2
-        v3 = self.v3
-        v4 = self.v4
-
-        v_point = (v1*weight(p1, point, power) +
-                   v2*weight(p2, point, power) +
-                   v3*weight(p3, point, power) +
-                   v4*weight(p4, point, power)) / \
-                  (weight(p1, point, power) +
-                   weight(p2, point, power) +
-                   weight(p3, point, power) +
-                   weight(p4, point, power))
-        return v_point
-
-    def nearest_nojit(self, point):
-        """Non-JIT nearest neighbor"""
-        dtype = point.dtype
-        p1 = self.p1
-        p2 = self.p2
-        p3 = self.p3
-        p4 = self.p4
-        v1 = self.v1
-        v2 = self.v2
-        v3 = self.v3
-        v4 = self.v4
-        values = (v1, v2, v3, v4)
-
-        dist = np.empty((4, point.shape[1]), dtype=dtype)
-        dist[0] = self._distance(p1, point)
-        dist[1] = self._distance(p2, point)
-        dist[2] = self._distance(p3, point)
-        dist[3] = self._distance(p4, point)
-
-        nearest = np.empty(point.shape[1], dtype=dtype)
-        for j in range(dist.shape[1]):
-            nearest[j] = values[np.argmin(dist[:,j])]
-
-        return nearest
-
-    def _call_jit(self, func, point, *args, **kwargs):
-        dtype = point.dtype
-        return func(self.p1, self.p2, self.p3, self.p4,
-                    point,
-                    self.v1, self.v2, self.v3, self.v4, *args, **kwargs)
-
-    @staticmethod
-    def _distance(xn, x):
-        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2 + (xn[2]-x[2])**2)
-
-
-class Elem2D(Element):
-    dimensionality = 2
-    def __init__(self, node1, node2, node3):
-        self.p1 = node1.coord
-        self.p2 = node2.coord
-        self.p3 = node3.coord
-        self.v1 = node1.value
-        self.v2 = node2.value
-        self.v3 = node3.value
-
-    def linear_nojit(self, point):
-        """Non-JIT linear interpolation for 2D self"""
-        dtype = point.dtype
-        p1 = self.p1
-        p2 = self.p2
-        p3 = self.p3
-        v1 = self.v1
-        v2 = self.v2
-        v3 = self.v3
-
-        trans = np.array([[p2[0]-p1[0], p3[0]-p1[0]],
-                          [p2[1]-p1[1], p3[1]-p1[1]]], dtype=dtype)
-        trans = npla.inv(trans)
-
-        ref_point = trans.dot(np.array([point[0]-p1[0],
-                                        point[1]-p1[1]], dtype=dtype))
-
-        tot_area = np.array([0.5], dtype=dtype)
-        area2 = np.array([0.5*1], dtype=dtype)*ref_point[0]
-        area3 = np.array([0.5*1], dtype=dtype)*ref_point[1]
-        area1 = tot_area - area2 - area3
-
-        v_point = v1*(area1/tot_area) + v2*(area2/tot_area) + v3*(area3/tot_area)
-
-        mask = np.ones_like(v_point, dtype="bool")
-        for a in [area1, area2, area3]:
-            mask *= (a/tot_area) > 0
-            mask *= (a/tot_area) < 1
-
-        v_point = np.ma.MaskedArray(v_point, ~mask)
-
-        return v_point#, mask
-
-    def idw_nojit(self, point, power=2):
-        """Non-JIT simple inverse distance weighting"""
-        def weight(xn, x, p):
-            return 1 / self._distance(xn, x) ** p
-
-        dtype = point.dtype
-        p1 = self.p1
-        p2 = self.p2
-        p3 = self.p3
-        v1 = self.v1
-        v2 = self.v2
-        v3 = self.v3
-
-        v_point = (v1 * weight(p1, point, power) +
-                   v2 * weight(p2, point, power) +
-                   v3 * weight(p3, point, power)) / \
-                  (weight(p1, point, power) +
-                   weight(p2, point, power) +
-                   weight(p3, point, power))
-        return v_point
-
-    def nearest_nojit(self, point):
-        """Non-JIT nearest neighbor"""
-        dtype = point.dtype
-        p1 = self.p1
-        p2 = self.p2
-        p3 = self.p3
-        v1 = self.v1
-        v2 = self.v2
-        v3 = self.v3
-        values = (v1, v2, v3)
-
-        dist = np.empty((3, point.shape[1]), dtype=dtype)
-        dist[0] = self._distance(p1, point)
-        dist[1] = self._distance(p2, point)
-        dist[2] = self._distance(p3, point)
-
-        nearest = np.empty(point.shape[1], dtype=dtype)
-        for j in range(dist.shape[1]):
-            nearest[j] = values[np.argmin(dist[:,j])]
-
-        return nearest
-
-    def _call_jit(self, func, point, *args, **kwargs):
-        dtype = point.dtype
-        return func(self.p1, self.p2, self.p3,
-                    point,
-                    self.v1, self.v2, self.v3, *args, **kwargs)
-
-    @staticmethod
-    def _distance(xn, x):
-        return sqrt((xn[0]-x[0])**2 + (xn[1]-x[1])**2)
 
 
 @jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:], nb.float32[:],
@@ -345,21 +137,18 @@ def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
 
         if vol1/(1./6) < 0 or \
            vol1/(1./6) > 1 or \
-           vol2/(1./6) > 0 or \
+           vol2/(1./6) < 0 or \
            vol2/(1./6) > 1 or \
-           vol3/(1./6) > 0 or \
-           vol3/(1./6) > 1:
+           vol3/(1./6) < 0 or \
+           vol3/(1./6) > 1 or \
+           vol4/(1./6) < 0 or \
+           vol4/(1./6) > 1:
             v_point[i] = -1
         else:
             v_point[i] = v1*(vol1/(1./6)) + v2*(vol2/(1./6)) + \
                          v3*(vol3/(1./6)) + v4*(vol4/(1./6))
 
-    # mask = np.ones_like(v_point, dtype=nb.uint8)
-    # for v in [vol1, vol2, vol3, vol4]:
-    #     mask &= (v/tot_vol) > 0
-    #     mask &= (v/tot_vol) < 1
-
-    return v_point#, mask
+    return v_point
 
 
 @jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:],

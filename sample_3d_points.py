@@ -1,7 +1,5 @@
 from node import Node
 from element import Element
-from node import Node3D
-from element import Elem3D
 import element
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,19 +20,11 @@ v2 = 2.2
 v3 = 3.4
 v4 = 4.6
 
-# n-dim
 node1 = Node(p1, v1)
 node2 = Node(p2, v2)
 node3 = Node(p3, v3)
 node4 = Node(p4, v4)
 triangle = Element([node1, node2, node3, node4])
-
-# 3-dim
-node1 = Node3D(p1, v1)
-node2 = Node3D(p2, v2)
-node3 = Node3D(p3, v3)
-node4 = Node3D(p4, v4)
-triangle3d = Elem3D(node1, node2, node3, node4)
 
 x_min = min(_[0] for _ in (p1, p2, p3, p4))
 y_min = min(_[1] for _ in (p1, p2, p3, p4))
@@ -108,19 +98,22 @@ def speed_comparison():
 
 
 def diff_triangles():
-    buff = triangle.sample('linear', points_f64, jit=False)
-    buff_3d = triangle3d.sample('linear', points_f64.T, jit=False)
-    buff.shape = x.shape
-    buff_3d.shape = x.shape
-    diff = buff.T - buff_3d.T
+    buff = triangle.sample('linear', points_f64, jit=True)
+    print(buff.shape)
+    buff_nojit = triangle.sample('linear', points_f64, jit=False)
+    print(buff_nojit.shape)
+    diff = buff - buff_nojit
 
     print(np.sum(diff))
 
 def slice_visualization():
     # Slice 3d visualization
 
-    buff = triangle.sample('nearest', points_f64, jit=False)
+    buff = triangle.sample('linear', points_f64, jit=True)
+    buff_nojit = triangle.sample('linear', points_f64, jit=False)
     buff.shape = x.shape
+    buff_nojit.shape = x.shape
+    diff = buff - buff_nojit
 
     if not os.path.isdir("frames3d"):
         os.mkdir("frames3d")
@@ -129,25 +122,25 @@ def slice_visualization():
         print(i)
 
         plt.clf()
-        plt.imshow(buff[i,:,:], origin='lower', interpolation='nearest',
+        plt.imshow(diff.T[i,:,:], origin='lower', interpolation='nearest',
                    extent=[y_min, y_max, z_min, z_max])
-        plt.clim(1, 4)
+        # plt.clim(0,5)
         plt.colorbar()
-        plt.savefig("frames/slice_x_%03i.png" % i)
+        plt.savefig("frames3d/slice_x_%03i.png" % i)
 
         plt.clf()
-        plt.imshow(buff[:,i,:], origin='lower', interpolation='nearest',
+        plt.imshow(diff.T[:,i,:], origin='lower', interpolation='nearest',
                    extent=[x_min, x_max, z_min, z_max])
-        plt.clim(1, 4)
+        # plt.clim(0,5)
         plt.colorbar()
-        plt.savefig("frames/slice_y_%03i.png" % i)
+        plt.savefig("frames3d/slice_y_%03i.png" % i)
 
         plt.clf()
-        plt.imshow(buff[:,:,i], origin='lower', interpolation='nearest',
+        plt.imshow(diff.T[:,:,i], origin='lower', interpolation='nearest',
                    extent=[x_min, x_max, y_min, y_max])
-        plt.clim(1, 4)
+        # plt.clim(0,5)
         plt.colorbar()
-        plt.savefig("frames/slice_z_%03i.png" % i)
+        plt.savefig("frames3d/slice_z_%03i.png" % i)
 
 
 # speed_comparison()

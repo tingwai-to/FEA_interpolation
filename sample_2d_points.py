@@ -1,7 +1,5 @@
 from node import Node
 from element import Element
-from node import Node2D
-from element import Elem2D
 import element
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,17 +17,10 @@ v1 = 1.
 v2 = 2.
 v3 = 3.
 
-# n-dim
 node1 = Node(p1, v1)
 node2 = Node(p2, v2)
 node3 = Node(p3, v3)
 triangle = Element([node1, node2, node3])
-
-# 2-dim
-node1_2d = Node2D(p1, v1)
-node2_2d = Node2D(p2, v2)
-node3_2d = Node2D(p3, v3)
-triangle2d = Elem2D(node1_2d, node2_2d, node3_2d)
 
 x_min = min(_[0] for _ in (p1, p2, p3))
 y_min = min(_[1] for _ in (p1, p2, p3))
@@ -52,7 +43,7 @@ def speed_comparison():
              ('idw', 64, True), #('idw', 32, True),
              ('idw', 64, False), #('idw', 32, False),
              ('nearest', 64, True), #('nearest', 32, True),
-             ('nearest', 64, False), ('nearest', 32, False)#
+             ('nearest', 64, False), #('nearest', 32, False)
              ]
 
     Ns = np.array([8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096])
@@ -101,14 +92,13 @@ def speed_comparison():
 def visualize_function():
     # Plot individual function
 
-    buff = triangle.sample('nearest', points_f64, jit=True)
-    buff_nojit = triangle.sample('nearest', points_f64, jit=False)
-    # buff_2d = triangle2d.sample('linear', points_f64.T, jit=True)
+    buff = triangle.sample('linear', points_f64, jit=True)
+    buff_nojit = triangle.sample('linear', points_f64, jit=False)
     buff.shape = x.shape
     buff_nojit.shape = x.shape
-    # buff_2d.shape = x.shape
     diff = buff.T - buff_nojit.T
 
+    print(np.sum(diff))
     plt.figure()
     plt.imshow(diff, extent=[x_min, x_max, y_min, y_max], origin='lower',
                interpolation='nearest')
@@ -121,17 +111,15 @@ def time_function():
     N=100
     start = time()
     for i in range(N):
-        # Elem2D class
-        buff_2d = triangle2d.sample('nearest', points_f32, jit=False)
+        buff = triangle.sample('nearest', points_f64, jit=True)
     end = time()
-    print('Elem2D:  %i times took %.5f seconds' % (N, end-start))
+    print('JIT:  %i times took %.5f seconds' % (N, end-start))
 
     start = time()
     for i in range(N):
-        # Element class
-        buff = triangle.sample('nearest', points_f32, jit=False)
+        buff = triangle.sample('nearest', points_f64, jit=False)
     end = time()
-    print('Element: %i times took %.5f seconds' % (N, end-start))
+    print('No-JIT: %i times took %.5f seconds' % (N, end-start))
 
 
 # speed_comparison()
