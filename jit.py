@@ -11,7 +11,7 @@ from time import time
 
 
 # CUDA and JIT shared kernel
-def linear_kernel(result, p1, point, v1, v2, v3, trans):
+def linear_kernel(p1, point, v1, v2, v3, trans):
     ref_point_x = trans[0,0]*(point[0]-p1[0]) + \
                   trans[0,1]*(point[1]-p1[0])
     ref_point_y = trans[1,0]*(point[0]-p1[1]) + \
@@ -30,13 +30,11 @@ def linear_kernel(result, p1, point, v1, v2, v3, trans):
     else:
         return v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
 
-cudacompiled = cuda.jit(nb.float64(nb.float64[:],
-                                   nb.float64[:], nb.float64[:],
+cudacompiled = cuda.jit(nb.float64(nb.float64[:], nb.float64[:],
                                    nb.float64, nb.float64, nb.float64,
                                    nb.float64[:,:]),
                         device=True)(linear_kernel)
-jitcompiled = jit(nb.float64(nb.float64[:],
-                             nb.float64[:], nb.float64[:],
+jitcompiled = jit(nb.float64(nb.float64[:], nb.float64[:],
                              nb.float64, nb.float64, nb.float64,
                              nb.float64[:,:]),
                   nopython=True)(linear_kernel)
@@ -47,10 +45,13 @@ jitcompiled = jit(nb.float64(nb.float64[:],
              nb.float64[:,:],
              nb.float64, nb.float64, nb.float64,
              nb.float64[:,:]),
-     nopython=True)
+             nopython=True)
 def linear_cpu_setup(result, p1, p2, p3, point, v1, v2, v3, trans):
+    p = np.empty(2, dtype=nb.float64)
     for i in range(point.shape[0]):
-        result[i] = jitcompiled(result, p1, point[i,:], v1, v2, v3, trans)
+        p[0] = point[i, 0]
+        p[1] = point[i, 1]
+        result[i] = jitcompiled(p1, p, v1, v2, v3, trans)
 
 @cuda.jit(argtypes = [nb.float64[:],
                       nb.float64[:], nb.float64[:], nb.float64[:],
@@ -62,9 +63,13 @@ def linear_gpu_setup(result, p1, p2, p3, point, v1, v2, v3, trans):
     ty = cuda.blockIdx.x
     bw = cuda.blockDim.x
     pos = tx + ty * bw
+    
+    p = nb.cuda.shared.array(2, nb.float64)
 
     if pos < result.size:
-        result[pos] = cudacompiled(result, p1, point[pos,:], v1, v2, v3, trans)
+        p[0] = point[pos,0]
+        p[1] = point[pos,1]
+        result[pos] = cudacompiled(p1, p, v1, v2, v3, trans)
 
 
 # Sample element
