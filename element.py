@@ -18,12 +18,19 @@ class Element(object):
         #: list of float: values of nodes
         self.values = np.array([thisnode.value for thisnode in nodes])
 
+        trans = (self.coords[1:,:] - self.coords[0,:]).T
+        #: np.array: transformation matrix for linear interpolation
+        self.trans = npla.inv(trans)
+
+
     def sample(self, method, point, *args, **kwargs):
         use_jit = kwargs.pop("jit", False)
         if use_jit:
             func = jit_functions['%sd' % self.dim][method]
             if method == 'idw':
                 kwargs['power'] = kwargs.get('power', 2)
+            elif method == 'linear':
+                kwargs['trans'] = self.trans
             return self._call_jit(func, point, *args, **kwargs)
         else:
             func = getattr(self, '%s_nojit' % method, None)
@@ -47,9 +54,7 @@ class Element(object):
     def linear_nojit(self, point):
         """Non-JIT linear interpolation for nD element"""
         dtype = point.dtype
-        trans = (self.coords[1:,:] - self.coords[0,:]).T
-        trans = npla.inv(trans)
-        ref_point = trans.dot((point-self.coords[0]).T).T
+        ref_point = self.trans.dot((point-self.coords[0]).T).T
 
         tot_vol = np.array([1./factorial(self.dim)], dtype=dtype)
         vols = []
@@ -98,26 +103,15 @@ class Element(object):
 
 @jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:], nb.float32[:],
                     nb.float32[:,:],
-                    nb.float32, nb.float32, nb.float32, nb.float32),
+                    nb.float32, nb.float32, nb.float32, nb.float32,
+                    nb.float32[:,:]),
       nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:], nb.float64[:],
                     nb.float64[:,:],
-                    nb.float64, nb.float64, nb.float64, nb.float64)],
+                    nb.float64, nb.float64, nb.float64, nb.float64,
+                    nb.float64[:,:])],
      nopython=True)
-def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
+def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4, trans):
     """JIT optimized linear interpolation for 3D element"""
-    # Transformation matrix to reference element
-    trans = np.empty((3,3), dtype=point.dtype)
-    trans[0,0] = p2[0]-p1[0]
-    trans[0,1] = p3[0]-p1[0]
-    trans[0,2] = p4[0]-p1[0]
-    trans[1,0] = p2[1]-p1[1]
-    trans[1,1] = p3[1]-p1[1]
-    trans[1,2] = p4[1]-p1[1]
-    trans[2,0] = p2[2]-p1[2]
-    trans[2,1] = p3[2]-p1[2]
-    trans[2,2] = p4[2]-p1[2]
-    trans = npla.inv(trans)
-
     v_point = np.empty(point.shape[0], dtype=point.dtype)
     for i in range(point.shape[0]):
         # Transform points to new space
@@ -153,21 +147,15 @@ def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
 
 @jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:],
                     nb.float32[:,:],
-                    nb.float32, nb.float32, nb.float32),
+                    nb.float32, nb.float32, nb.float32,
+                    nb.float32[:,:]),
       nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:],
                     nb.float64[:,:],
-                    nb.float64, nb.float64, nb.float64)],
+                    nb.float64, nb.float64, nb.float64,
+                    nb.float64[:,:])],
      nopython=True)
-def linear_2d(p1, p2, p3, point, v1, v2, v3):
+def linear_2d(p1, p2, p3, point, v1, v2, v3, trans):
     """JIT optimized linear interpolation for 2D element"""
-    # Transformation matrix to reference element
-    trans = np.empty((2,2), dtype=point.dtype)
-    trans[0,0] = p2[0] - p1[0]
-    trans[0,1] = p3[0] - p1[0]
-    trans[1,0] = p2[1] - p1[1]
-    trans[1,1] = p3[1] - p1[1]
-    trans = npla.inv(trans)
-
     v_point = np.empty(point.shape[0], dtype=point.dtype)
     for i in range(point.shape[0]):
         # Transform points to new space

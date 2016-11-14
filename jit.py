@@ -45,39 +45,23 @@ jitcompiled = jit(nb.float64(nb.float64[:],
 @jit(nb.void(nb.float64[:],
              nb.float64[:], nb.float64[:], nb.float64[:],
              nb.float64[:,:],
-             nb.float64, nb.float64, nb.float64),
+             nb.float64, nb.float64, nb.float64,
+             nb.float64[:,:]),
      nopython=True)
-def linear_cpu_setup(result, p1, p2, p3, point, v1, v2, v3):
-    trans = np.empty((2,2), dtype=point.dtype)
-    trans[0,0] = p2[0] - p1[0]
-    trans[0,1] = p3[0] - p1[0]
-    trans[1,0] = p2[1] - p1[1]
-    trans[1,1] = p3[1] - p1[1]
-    trans = npla.inv(trans)
-
+def linear_cpu_setup(result, p1, p2, p3, point, v1, v2, v3, trans):
     for i in range(point.shape[0]):
         result[i] = jitcompiled(result, p1, point[i,:], v1, v2, v3, trans)
 
 @cuda.jit(argtypes = [nb.float64[:],
                       nb.float64[:], nb.float64[:], nb.float64[:],
                       nb.float64[:,:],
-                      nb.float64, nb.float64, nb.float64])
-def linear_gpu_setup(result, p1, p2, p3, point, v1, v2, v3):
+                      nb.float64, nb.float64, nb.float64,
+                      nb.float64[:,:]])
+def linear_gpu_setup(result, p1, p2, p3, point, v1, v2, v3, trans):
     tx = cuda.threadIdx.x
     ty = cuda.blockIdx.x
     bw = cuda.blockDim.x
     pos = tx + ty * bw
-
-    # TODO: implement matrix inversion another way
-    trans = cuda.shared.array(shape=(2,2), dtype=nb.float64)
-    a = p2[0] - p1[0]
-    b = p3[0] - p1[0]
-    c = p2[1] - p1[1]
-    d = p3[1] - p1[1]
-    trans[0,0] = d/(a*d-b*c)
-    trans[0,1] = -b/(a*d-b*c)
-    trans[1,0] = -c/(a*d-b*c)
-    trans[1,1] = a/(a*d-b*c)
 
     if pos < result.size:
         result[pos] = cudacompiled(result, p1, point[pos,:], v1, v2, v3, trans)
@@ -90,6 +74,10 @@ p3 = np.array([1, 4], dtype='f8')
 v1 = 1.
 v2 = 2.
 v3 = 3.
+
+trans = np.array([[p2[0]-p1[0], p3[0]-p1[0]],
+                  [p2[1]-p1[1], p3[1]-p1[1]]], dtype='f8')
+trans = npla.inv(trans)
 
 x_min = min(_[0] for _ in (p1, p2, p3))
 y_min = min(_[1] for _ in (p1, p2, p3))
@@ -106,21 +94,39 @@ point = np.array([_.ravel() for _ in (x, y)], dtype='f8').T
 cpu_result = np.empty((N**2), dtype='f8')
 start = time()
 for i in range(100):
-    linear_cpu_setup(cpu_result, p1, p2, p3, point, v1, v2, v3)
+    linear_cpu_setup(cpu_result, p1, p2, p3, point, v1, v2, v3, trans)
 end = time()
-print(end-start)
+print('{:20s} {:3f}'.format('CPU', end-start))
+print()
 cpu_result.shape = x.shape
 
 # GPU
 gpu_result = cuda.device_array((N**2), dtype='f8')
 threadsperblock = 32
 blockspergrid = (gpu_result.size + (threadsperblock - 1)) // threadsperblock
+
+start = time()
+# Copy array from host -> device
+p1 = cuda.to_device(p1)
+p2 = cuda.to_device(p2)
+p3 = cuda.to_device(p3)
+point = cuda.to_device(point)
+trans = cuda.to_device(trans)
+end = time()
+print('{:20s} {:3f}'.format('Copy to device', end-start))
+
 start = time()
 for i in range(100):
-    linear_gpu_setup[blockspergrid, threadsperblock](gpu_result, p1, p2, p3, point, v1, v2, v3)
+    linear_gpu_setup[blockspergrid, threadsperblock]\
+        (gpu_result, p1, p2, p3, point, v1, v2, v3, trans)
 end = time()
-print(end-start)
+print('{:20s} {:3f}'.format('GPU', end-start))
+
+start = time()
+# Copy array back, device -> host
 gpu_result = gpu_result.copy_to_host()
+end =time()
+print('{:20s} {:3f}'.format('Copy back to host', end-start))
 gpu_result.shape = x.shape
 
 diff = cpu_result.T - gpu_result.T
