@@ -34,37 +34,45 @@ cudacompiled = cuda.jit(nb.float64(nb.float64[:], nb.float64[:],
                                    nb.float64, nb.float64, nb.float64,
                                    nb.float64[:,:]),
                         device=True)(linear_kernel)
-jitcompiled = jit(nb.float64(nb.float64[:], nb.float64[:],
+jitcompiled = jit([nb.float64(nb.float64[:], nb.float64[:],
                              nb.float64, nb.float64, nb.float64,
                              nb.float64[:,:]),
+                   nb.float32(nb.float32[:], nb.float32[:],
+                             nb.float32, nb.float32, nb.float32,
+                             nb.float32[:,:])],
                   nopython=True)(linear_kernel)
 
 
-@jit(nb.void(nb.float64[:],
-             nb.float64[:], nb.float64[:], nb.float64[:],
-             nb.float64[:,:],
-             nb.float64, nb.float64, nb.float64,
-             nb.float64[:,:]),
-             nopython=True)
+@jit([nb.void(nb.float64[:],
+              nb.float64[:], nb.float64[:], nb.float64[:],
+              nb.float64[:,:],
+              nb.float64, nb.float64, nb.float64,
+              nb.float64[:,:]),
+      nb.void(nb.float32[:],
+              nb.float32[:], nb.float32[:], nb.float32[:],
+              nb.float32[:,:],
+              nb.float32, nb.float32, nb.float32,
+              nb.float32[:,:])],
+     nopython=True)
 def linear_cpu_setup(result, p1, p2, p3, point, v1, v2, v3, trans):
-    p = np.empty(2, dtype=nb.float64)
+    p = np.empty(2, dtype=point.dtype)
     for i in range(point.shape[0]):
         p[0] = point[i, 0]
         p[1] = point[i, 1]
         result[i] = jitcompiled(p1, p, v1, v2, v3, trans)
 
-@cuda.jit(argtypes = [nb.float64[:],
-                      nb.float64[:], nb.float64[:], nb.float64[:],
-                      nb.float64[:,:],
-                      nb.float64, nb.float64, nb.float64,
-                      nb.float64[:,:]])
+@cuda.jit(nb.void(nb.float64[:],
+                  nb.float64[:], nb.float64[:], nb.float64[:],
+                  nb.float64[:,:],
+                  nb.float64, nb.float64, nb.float64,
+                  nb.float64[:,:]))
 def linear_gpu_setup(result, p1, p2, p3, point, v1, v2, v3, trans):
     tx = cuda.threadIdx.x
     ty = cuda.blockIdx.x
     bw = cuda.blockDim.x
     pos = tx + ty * bw
-    
-    p = nb.cuda.shared.array(2, nb.float64)
+
+    p = cuda.shared.array(2, nb.float64)
 
     if pos < result.size:
         p[0] = point[pos,0]
@@ -76,6 +84,9 @@ def linear_gpu_setup(result, p1, p2, p3, point, v1, v2, v3, trans):
 p1 = np.array([2, 2], dtype='f8')
 p2 = np.array([4, 3], dtype='f8')
 p3 = np.array([1, 4], dtype='f8')
+p1_32 = p1.astype('f')
+p2_32 = p2.astype('f')
+p3_32 = p3.astype('f')
 v1 = 1.
 v2 = 2.
 v3 = 3.
@@ -83,17 +94,18 @@ v3 = 3.
 trans = np.array([[p2[0]-p1[0], p3[0]-p1[0]],
                   [p2[1]-p1[1], p3[1]-p1[1]]], dtype='f8')
 trans = npla.inv(trans)
+trans_32 = trans.astype('f')
 
 x_min = min(_[0] for _ in (p1, p2, p3))
 y_min = min(_[1] for _ in (p1, p2, p3))
 x_max = max(_[0] for _ in (p1, p2, p3))
 y_max = max(_[1] for _ in (p1, p2, p3))
 
-N = 1024
+N = 2048
 x, y = np.mgrid[x_min:x_max:1j*N,
                 y_min:y_max:1j*N]
 point = np.array([_.ravel() for _ in (x, y)], dtype='f8').T
-
+point_32 = point.astype('f')
 
 # CPU
 cpu_result = np.empty((N**2), dtype='f8')
@@ -101,39 +113,49 @@ start = time()
 for i in range(100):
     linear_cpu_setup(cpu_result, p1, p2, p3, point, v1, v2, v3, trans)
 end = time()
-print('{:20s} {:3f}'.format('CPU', end-start))
+print('{:20s} {:f}'.format('CPU 64', end-start))
 print()
-cpu_result.shape = x.shape
+
+cpu_result_32 = np.empty((N**2), dtype='f')
+start = time()
+for i in range(100):
+    linear_cpu_setup(cpu_result_32, p1_32, p2_32, p3_32, point_32, v1, v2, v3, trans_32)
+end = time()
+print('{:20s} {:f}'.format('CPU 32', end-start))
+print()
+
 
 # GPU
 gpu_result = cuda.device_array((N**2), dtype='f8')
 threadsperblock = 32
 blockspergrid = (gpu_result.size + (threadsperblock - 1)) // threadsperblock
 
-start = time()
 # Copy array from host -> device
+start = time()
 p1 = cuda.to_device(p1)
 p2 = cuda.to_device(p2)
 p3 = cuda.to_device(p3)
 point = cuda.to_device(point)
 trans = cuda.to_device(trans)
 end = time()
-print('{:20s} {:3f}'.format('Copy to device', end-start))
+print('{:20s} {:f}'.format('Copy to device', end-start))
 
 start = time()
 for i in range(100):
     linear_gpu_setup[blockspergrid, threadsperblock]\
         (gpu_result, p1, p2, p3, point, v1, v2, v3, trans)
 end = time()
-print('{:20s} {:3f}'.format('GPU', end-start))
+print('{:20s} {:f}'.format('GPU 64', end-start))
 
 start = time()
 # Copy array back, device -> host
 gpu_result = gpu_result.copy_to_host()
 end =time()
-print('{:20s} {:3f}'.format('Copy back to host', end-start))
-gpu_result.shape = x.shape
+print('{:20s} {:f}'.format('Copy back to host', end-start))
 
+
+cpu_result.shape = x.shape
+gpu_result.shape = x.shape
 diff = cpu_result.T - gpu_result.T
 
 plt.figure()
