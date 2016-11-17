@@ -38,7 +38,7 @@ def linear_gpu_setup(result, p1, p2, p3, point, v1, v2, v3, trans):
     bw = cuda.blockDim.x
     pos = tx + ty * bw
 
-    p = cuda.shared.array(2, nb.float64)
+    p = cuda.local.array(2, nb.float64)
 
     if pos < result.size:
         p[0] = point[pos,0]
@@ -74,7 +74,7 @@ def idw_gpu_setup(result, p1, p2, p3, point, v1, v2, v3, power):
     bw = cuda.blockDim.x
     pos = tx + ty * bw
 
-    p = cuda.shared.array(2, nb.float64)
+    p = cuda.local.array(2, nb.float64)
 
     if pos < result.size:
         p[0] = point[pos,0]
@@ -107,7 +107,7 @@ def nearest_gpu_setup(result, p1, p2, p3, point, v1, v2, v3):
     bw = cuda.blockDim.x
     pos = tx + ty * bw
 
-    p = cuda.shared.array(2, nb.float64)
+    p = cuda.local.array(2, nb.float64)
 
     if pos < result.size:
         p[0] = point[pos,0]
@@ -149,9 +149,10 @@ end = time()
 print('{:20s} {:f}'.format('Copy to device', end-start))
 
 start = time()
-for i in range(1):
-    idw_gpu_setup[blockspergrid, threadsperblock]\
-        (gpu_result, p1, p2, p3, point, v1, v2, v3, power)
+with cuda.profiling():
+    for i in range(1):
+        idw_gpu_setup[blockspergrid, threadsperblock]\
+            (gpu_result, p1, p2, p3, point, v1, v2, v3, power)
 end = time()
 print('{:20s} {:f}'.format('GPU 64', end-start))
 
