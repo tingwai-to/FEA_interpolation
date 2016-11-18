@@ -93,8 +93,8 @@ def idw_gpu_setup(result, p1, p2, p3, point, v1, v2, v3, power):
 def nearest_cpu_setup(result, p1, p2, p3, point, v1, v2, v3):
     p = np.empty(2, dtype=point.dtype)
     for i in range(point.shape[0]):
-        p[0] = point[i, 0]
-        p[1] = point[i, 1]
+        p[0] = point[i,0]
+        p[1] = point[i,1]
         result[i] = jit_kernel.nearest_jit(p1, p2, p3, p, v1, v2, v3)
 
 @cuda.jit(nb.void(nb.float64[:],
@@ -115,7 +115,8 @@ def nearest_gpu_setup(result, p1, p2, p3, point, v1, v2, v3):
         result[pos] = jit_kernel.nearest_cuda(p1, p2, p3, p, v1, v2, v3)
 
 
-from sample_2d_points import *
+"""
+from test_data import *
 
 # CPU
 cpu_result = np.empty((N**2), dtype='f8')
@@ -173,3 +174,4 @@ plt.imshow(cpu_result.T, extent=[x_min, x_max, y_min, y_max], origin='lower',
 plt.plot([p1[0], p2[0], p3[0], p1[0]], [p1[1], p2[1], p3[1], p1[1]], '-k')
 plt.colorbar()
 plt.show()
+"""

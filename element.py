@@ -7,6 +7,7 @@ from numba import cuda
 import numba as nb
 from math import factorial
 from scipy.spatial.distance import cdist
+import jit_setup
 
 
 class Element(object):
@@ -22,34 +23,47 @@ class Element(object):
         #: np.array: transformation matrix for linear interpolation
         self.trans = npla.inv(trans)
 
-
     def sample(self, method, point, *args, **kwargs):
-        use_jit = kwargs.pop("jit", False)
-        if use_jit:
-            func = jit_functions['%sd' % self.dim][method]
+        target = kwargs.pop("jit", False)
+        # TODO: if gpu then convert with cuda.to_device
+        if target:
+            result = np.empty((point.shape[0]), dtype=point.dtype)
+
+            func = jit_functions.get('%sd' % self.dim, None)
+            if func is None:
+                raise AttributeError('JIT in %sd not supported' % self.dim)
+            func = func.get(target+'_'+method, None)
+            if func is None:
+                raise AttributeError('%s %s function not supported' % (target.upper(), method))
+
             if method == 'idw':
                 kwargs['power'] = kwargs.get('power', 2)
             elif method == 'linear':
                 kwargs['trans'] = self.trans
-            return self._call_jit(func, point, *args, **kwargs)
+
+            return self._call_jit(func, result, point, *args, **kwargs)
         else:
             func = getattr(self, '%s_nojit' % method, None)
             if func is None:
                 raise AttributeError('No interpolation function called %s' % method)
             return func(point, *args, **kwargs)
 
-    def _call_jit(self, func, point, *args, **kwargs):
-        dtype = point.dtype
+    def _call_jit(self, func, result, point, *args, **kwargs):
+        # TODO: gpu can't accept *args, *kwargs
         if self.dim == 2:
-            return func(self.coords[0], self.coords[1], self.coords[2],
-                        point,
-                        self.values[0], self.values[1], self.values[2],
-                        *args, **kwargs)
+            func(result,
+                 self.coords[0], self.coords[1], self.coords[2],
+                 point,
+                 self.values[0], self.values[1], self.values[2],
+                 *args, **kwargs)
+            return result
         if self.dim == 3:
-            return func(self.coords[0], self.coords[1], self.coords[2], self.coords[3],
-                        point,
-                        self.values[0], self.values[1], self.values[2], self.values[3],
-                        *args, **kwargs)
+            func(result,
+                 self.coords[0], self.coords[1], self.coords[2], self.coords[3],
+                 point,
+                 self.values[0], self.values[1], self.values[2], self.values[3],
+                 *args, **kwargs)
+            return result
 
     def linear_nojit(self, point):
         """Non-JIT linear interpolation for nD element"""
@@ -73,7 +87,7 @@ class Element(object):
         v_point = np.ma.MaskedArray(v_point, ~mask)
         v_point = v_point.filled(fill_value=-1.)
 
-        return v_point#, mask
+        return v_point
 
     def idw_nojit(self, point, power=2):
         """Non-JIT simple inverse distance weighting for nD element"""
@@ -307,6 +321,9 @@ jit_functions['3d']['idw'] = idw_simple_3d
 jit_functions['3d']['nearest'] = nearest_3d
 
 jit_functions['2d']= {}
-jit_functions['2d']['linear'] = linear_2d
-jit_functions['2d']['idw'] = idw_simple_2d
-jit_functions['2d']['nearest'] = nearest_2d
+jit_functions['2d']['cpu_linear'] = jit_setup.linear_cpu_setup
+jit_functions['2d']['cpu_idw'] = jit_setup.idw_cpu_setup
+jit_functions['2d']['cpu_nearest'] = jit_setup.nearest_cpu_setup
+jit_functions['2d']['gpu_linear'] = jit_setup.linear_gpu_setup
+jit_functions['2d']['gpu_idw'] = jit_setup.idw_gpu_setup
+jit_functions['2d']['gpu_nearest'] = jit_setup.nearest_gpu_setup
