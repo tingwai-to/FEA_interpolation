@@ -25,7 +25,6 @@ class Element(object):
 
     def sample(self, method, point, *args, **kwargs):
         target = kwargs.pop("jit", False)
-        # TODO: if gpu then convert with cuda.to_device
         if target:
             result = np.empty((point.shape[0]), dtype=point.dtype)
 
@@ -37,10 +36,12 @@ class Element(object):
                 raise AttributeError('%s %s function not supported' % (target.upper(), method))
 
             if method == 'idw':
-                kwargs['power'] = kwargs.get('power', 2)
+                kwargs.setdefault('power', 2)
             elif method == 'linear':
                 kwargs['trans'] = self.trans
 
+            if target == 'gpu':
+                return self._call_cuda(func, result, point, method, *args, **kwargs)
             return self._call_jit(func, result, point, *args, **kwargs)
         else:
             func = getattr(self, '%s_nojit' % method, None)
@@ -49,21 +50,47 @@ class Element(object):
             return func(point, *args, **kwargs)
 
     def _call_jit(self, func, result, point, *args, **kwargs):
-        # TODO: gpu can't accept *args, *kwargs
         if self.dim == 2:
             func(result,
                  self.coords[0], self.coords[1], self.coords[2],
                  point,
                  self.values[0], self.values[1], self.values[2],
                  *args, **kwargs)
-            return result
-        if self.dim == 3:
+        elif self.dim == 3:
             func(result,
                  self.coords[0], self.coords[1], self.coords[2], self.coords[3],
                  point,
                  self.values[0], self.values[1], self.values[2], self.values[3],
                  *args, **kwargs)
-            return result
+        return result
+
+    def _call_cuda(self, func, result, point, method, *args, **kwargs):
+        gpu_result = cuda.to_device(result)
+        threadsperblock = 32
+        blockspergrid = (gpu_result.size + (threadsperblock - 1)) // threadsperblock
+        if self.dim == 2:
+            if method == 'linear':
+                func[blockspergrid, threadsperblock]\
+                    (gpu_result,
+                     cuda.to_device(self.coords[0]), cuda.to_device(self.coords[1]), cuda.to_device(self.coords[2]),
+                     cuda.to_device(point),
+                     self.values[0], self.values[1], self.values[2],
+                     cuda.to_device(kwargs['trans']))
+            elif method == 'idw':
+                func[blockspergrid, threadsperblock]\
+                    (gpu_result,
+                     cuda.to_device(self.coords[0]), cuda.to_device(self.coords[1]), cuda.to_device(self.coords[2]),
+                     cuda.to_device(point),
+                     self.values[0], self.values[1], self.values[2],
+                     kwargs['power'])
+            else:
+                func[blockspergrid, threadsperblock]\
+                    (gpu_result,
+                     cuda.to_device(self.coords[0]), cuda.to_device(self.coords[1]), cuda.to_device(self.coords[2]),
+                     cuda.to_device(point),
+                     self.values[0], self.values[1], self.values[2])
+        result = gpu_result.copy_to_host()
+        return result
 
     def linear_nojit(self, point):
         """Non-JIT linear interpolation for nD element"""
@@ -81,8 +108,8 @@ class Element(object):
 
         mask = np.ones_like(v_point, dtype="bool")
         for v in vols:
-            mask &= (v/tot_vol) > 0
-            mask &= (v/tot_vol) < 1
+            mask &= (v/tot_vol) >= 0
+            mask &= (v/tot_vol) <= 1
 
         v_point = np.ma.MaskedArray(v_point, ~mask)
         v_point = v_point.filled(fill_value=-1.)
