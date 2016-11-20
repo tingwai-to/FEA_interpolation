@@ -48,21 +48,21 @@ def idw_kernel(p1, p2, p3, point, v1, v2, v3, power):
 
     weights = 0
     v_weights = 0
-    if distance_p1 != 0:
-        weight_p1 = 1 / distance_p1
-        v_weight_p1 = v1*weight_p1
-        weights += weight_p1
-        v_weights += v_weight_p1
-    if distance_p2 != 0:
-        weight_p2 = 1 / distance_p2
-        v_weight_p2 = v2*weight_p2
-        weights += weight_p2
-        v_weights += v_weight_p2
-    if distance_p3 != 0:
-        weight_p3 = 1 / distance_p3
-        v_weight_p3 = v3*weight_p3
-        weights += weight_p3
-        v_weights += v_weight_p3
+    distance_p1 = max(distance_p1, 1e-16)
+    distance_p2 = max(distance_p2, 1e-16)
+    distance_p3 = max(distance_p3, 1e-16)
+    weight_p1 = 1 / distance_p1
+    v_weight_p1 = v1*weight_p1
+    weights += weight_p1
+    v_weights += v_weight_p1
+    weight_p2 = 1 / distance_p2
+    v_weight_p2 = v2*weight_p2
+    weights += weight_p2
+    v_weights += v_weight_p2
+    weight_p3 = 1 / distance_p3
+    v_weight_p3 = v3*weight_p3
+    weights += weight_p3
+    v_weights += v_weight_p3
 
     if v_weights == 0:
         return -1
