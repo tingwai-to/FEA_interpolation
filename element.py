@@ -12,6 +12,13 @@ import jit_setup
 
 class Element(object):
     def __init__(self, nodes):
+        """Create an element.
+
+        Args:
+            nodes (list of Node): Dimension of nodes in list must be the same.
+                Number of nodes in list (n) should equal desired dimension of
+                Element plus one. ie. n = dim + 1
+        """
         #: int: dimensionality of element, derived from Node
         self.dim = nodes[0].dim
         #: list of np.array: coordinates of nodes
@@ -24,21 +31,48 @@ class Element(object):
         self.trans = npla.inv(trans)
 
     def sample(self, method, point, *args, **kwargs):
+        """Calls interpolation function
+
+        Args:
+            method (str): Desired interpolation style (linear, idw, nearest)
+            point (np.array): Array of n-number of points to be interpolated
+                eg. where dim=2:
+                point = np.array([[x0, y0],
+                                  [x1, y1],
+                                  [.., ..].
+                                  [xn, yn]])
+
+            **kwargs:
+                jit (str, bool): Desired compilation method (cpu, gpu)
+                    Defaults to False
+                power (int): power parameter of for inverse distance weighting
+                    Positive integer. Defaults to 2 if not provided
+
+        Returns:
+            func: non-JIT interpolation function called if jit argument not provided
+                This will then return a np.array of interpolated values
+            _call_cuda: called if jit='gpu'
+            _call_jit: called if jit='cpu'
+
+        Raises:
+            AttributeError: desired interpolation style not supported
+            ValueError: interpolation in Element.dim not supported
+        """
         target = kwargs.pop("jit", False)
         if target:
-            result = np.empty((point.shape[0]), dtype=point.dtype)
-
             func = jit_functions.get('%sd' % self.dim, None)
             if func is None:
-                raise AttributeError('JIT in %sd not supported' % self.dim)
+                raise ValueError('JIT in %sd not supported' % self.dim)
             func = func.get(target+'_'+method, None)
             if func is None:
-                raise AttributeError('%s %s function not supported' % (target.upper(), method))
+                raise AttributeError('%s %s function not supported' % (target, method))
 
             if method == 'idw':
                 kwargs.setdefault('power', 2)
             elif method == 'linear':
                 kwargs['trans'] = self.trans
+
+            result = np.empty((point.shape[0]), dtype=point.dtype)
 
             if target == 'gpu':
                 return self._call_cuda(func, result, point, method, *args, **kwargs)
@@ -46,10 +80,26 @@ class Element(object):
         else:
             func = getattr(self, '%s_nojit' % method, None)
             if func is None:
-                raise AttributeError('No interpolation function called %s' % method)
+                raise AttributeError('%s function not supported' % method)
             return func(point, *args, **kwargs)
 
     def _call_jit(self, func, result, point, *args, **kwargs):
+        """Calls appropriate CPU JIT kernel.
+
+        Args:
+            func (function): CPU JIT kernel
+            result (np.array): 1-D array of same length as point, values will
+                be populated by func
+            point (np.array): Array of n-number of points to be interpolated
+
+            **kwargs:
+                power (int): power parameter of for inverse distance weighting
+                trans (np.array): transformation matrix, only provide if
+                    interpolation style is linear
+
+        Returns:
+            result: array of interpolated values at sampled points
+        """
         if self.dim == 2:
             func(result,
                  self.coords[0], self.coords[1], self.coords[2],
@@ -65,6 +115,26 @@ class Element(object):
         return result
 
     def _call_cuda(self, func, result, point, method, *args, **kwargs):
+        """Calls appropriate GPU JIT kernel.
+
+        Note:
+            CUDA kernels can't accept *args, **kwargs. Arguments like power
+            or trans have to be manually passed in.
+
+        Args:
+            func (function): CUDA kernel
+            result (np.array): 1-D array of same length as point, values will
+                be populated by func
+            point (np.array): Array of n-number of points to be interpolated
+
+            **kwargs:
+                power (int): power parameter of for inverse distance weighting
+                trans (np.array): transformation matrix, only provide if
+                    interpolation style is linear
+
+        Returns:
+            result: array of interpolated values at sampled points
+        """
         gpu_result = cuda.to_device(result)
         threadsperblock = 32
         blockspergrid = (gpu_result.size + (threadsperblock - 1)) // threadsperblock
@@ -186,41 +256,6 @@ def linear_3d(p1, p2, p3, p4, point, v1, v2, v3, v4, trans):
     return v_point
 
 
-@jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:],
-                    nb.float32[:,:],
-                    nb.float32, nb.float32, nb.float32,
-                    nb.float32[:,:]),
-      nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:],
-                    nb.float64[:,:],
-                    nb.float64, nb.float64, nb.float64,
-                    nb.float64[:,:])],
-     nopython=True)
-def linear_2d(p1, p2, p3, point, v1, v2, v3, trans):
-    """JIT optimized linear interpolation for 2D element"""
-    v_point = np.empty(point.shape[0], dtype=point.dtype)
-    for i in range(point.shape[0]):
-        # Transform points to new space
-        ref_point_x = trans[0,0]*(point[i,0]-p1[0]) + \
-                      trans[0,1]*(point[i,1]-p1[0])
-        ref_point_y = trans[1,0]*(point[i,0]-p1[1]) + \
-                      trans[1,1]*(point[i,1]-p1[1])
-        area2 = 0.5*ref_point_x
-        area3 = 0.5*ref_point_y
-        area1 = 0.5 - area2 - area3
-
-        if (area1/0.5) < 0 or \
-           (area1/0.5) > 1 or \
-           (area2/0.5) < 0 or \
-           (area2/0.5) > 1 or \
-           (area3/0.5) < 0 or \
-           (area3/0.5) > 1:
-            v_point[i] = -1
-        else:
-            v_point[i] = v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
-
-    return v_point
-
-
 @jit([nb.float32[:](nb.float32[:], nb.float32[:,:]),
       nb.float64[:](nb.float64[:], nb.float64[:,:])],
      nopython=True)
@@ -229,28 +264,12 @@ def distance_3d(xn, x):
     return sqrt((xn[0]-x[:,0])**2 + (xn[1]-x[:,1])**2 + (xn[2]-x[:,2])**2)
 
 
-@jit([nb.float32[:](nb.float32[:], nb.float32[:,:]),
-      nb.float64[:](nb.float64[:], nb.float64[:,:])],
-     nopython=True)
-def distance_2d(xn, x):
-    """Distance of nodes to points"""
-    return sqrt((xn[0]-x[:,0])**2 + (xn[1]-x[:,1])**2)
-
-
 @jit([nb.float32[:](nb.float32[:], nb.float32[:,:], nb.int32),
       nb.float64[:](nb.float64[:], nb.float64[:,:], nb.int32)],
      nopython=True)
 def weight_3d(xn, x, p):
     """Weight of nodes to point"""
     return 1 / distance_3d(xn, x)**p
-
-
-@jit([nb.float32[:](nb.float32[:], nb.float32[:,:], nb.int32),
-      nb.float64[:](nb.float64[:], nb.float64[:,:], nb.int32)],
-     nopython=True)
-def weight_2d(xn, x, p):
-    """Weight of nodes to point"""
-    return 1 / distance_2d(xn, x)**p
 
 
 @jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:], nb.float32[:],
@@ -265,33 +284,10 @@ def nearest_3d(p1, p2, p3, p4, point, v1, v2, v3, v4):
     values = (v1, v2, v3, v4)
 
     dist = np.empty((4, point.shape[0]), dtype=point.dtype)
-    dist[0] = distance_2d(p1, point)
-    dist[1] = distance_2d(p2, point)
-    dist[2] = distance_2d(p3, point)
-    dist[3] = distance_2d(p4, point)
-
-    nearest = np.empty(point.shape[0], dtype=point.dtype)
-    for j in range(dist.shape[1]):
-        nearest[j] = values[np.argmin(dist[:,j])]
-
-    return nearest
-
-
-@jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:],
-                    nb.float32[:,:],
-                    nb.float32, nb.float32, nb.float32),
-      nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:],
-                    nb.float64[:,:],
-                    nb.float64, nb.float64, nb.float64)],
-     nopython=True)
-def nearest_2d(p1, p2, p3, point, v1, v2, v3):
-    """JIT optimized nearest neighbor interpolation for 2D element"""
-    values = (v1, v2, v3)
-
-    dist = np.empty((3, point.shape[0]), dtype=point.dtype)
-    dist[0] = distance_2d(p1, point)
-    dist[1] = distance_2d(p2, point)
-    dist[2] = distance_2d(p3, point)
+    dist[0] = distance_3d(p1, point)
+    dist[1] = distance_3d(p2, point)
+    dist[2] = distance_3d(p3, point)
+    dist[3] = distance_3d(p4, point)
 
     nearest = np.empty(point.shape[0], dtype=point.dtype)
     for j in range(dist.shape[1]):
@@ -319,24 +315,6 @@ def idw_simple_3d(p1, p2, p3, p4, point, v1, v2, v3, v4, power):
                weight_3d(p2, point, power) +
                weight_3d(p3, point, power) +
                weight_3d(p4, point, power))
-    return v_point
-
-
-@jit([nb.float32[:](nb.float32[:], nb.float32[:], nb.float32[:],
-                    nb.float32[:,:],
-                    nb.float32, nb.float32, nb.float32, nb.int32),
-      nb.float64[:](nb.float64[:], nb.float64[:], nb.float64[:],
-                    nb.float64[:,:],
-                    nb.float64, nb.float64, nb.float64, nb.int32)],
-     nopython=True)
-def idw_simple_2d(p1, p2, p3, point, v1, v2, v3, power):
-    """Simple inverse distance weighting function"""
-    v_point = (v1*weight_2d(p1, point, power) +
-               v2*weight_2d(p2, point, power) +
-               v3*weight_2d(p3, point, power)) / \
-              (weight_2d(p1, point, power) +
-               weight_2d(p2, point, power) +
-               weight_2d(p3, point, power))
     return v_point
 
 

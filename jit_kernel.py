@@ -1,15 +1,13 @@
 from __future__ import print_function
 from __future__ import division
-import numpy as np
-import numpy.linalg as npla
 from math import sqrt
 import numba as nb
 from numba import jit
 from numba import cuda
 
 
-# CUDA and JIT shared kernel
 def linear_kernel(p1, point, v1, v2, v3, trans):
+    """CPU/GPU shared kernel for linear 2D interpolation"""
     ref_point_x = trans[0,0]*(point[0]-p1[0]) + \
                   trans[0,1]*(point[1]-p1[0])
     ref_point_y = trans[1,0]*(point[0]-p1[1]) + \
@@ -28,6 +26,7 @@ def linear_kernel(p1, point, v1, v2, v3, trans):
     else:
         return v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
 
+# Compiles linear kernel for CPU and CUDA
 linear_cuda = cuda.jit(nb.float64(nb.float64[:], nb.float64[:],
                                   nb.float64, nb.float64, nb.float64,
                                   nb.float64[:,:]),
@@ -42,6 +41,7 @@ linear_jit = jit([nb.float64(nb.float64[:], nb.float64[:],
 
 
 def idw_kernel(p1, p2, p3, point, v1, v2, v3, power):
+    """CPU/GPU shared kernel for inverse distance weighting 2D interpolation"""
     distance_p1 = sqrt((p1[0]-point[0])**2 + (p1[1]-point[1])**2)**power
     distance_p2 = sqrt((p2[0]-point[0])**2 + (p2[1]-point[1])**2)**power
     distance_p3 = sqrt((p3[0]-point[0])**2 + (p3[1]-point[1])**2)**power
@@ -69,6 +69,7 @@ def idw_kernel(p1, p2, p3, point, v1, v2, v3, power):
     v_point = v_weights/weights
     return v_point
 
+# Compiles inverse distance weighting kernel for CPU and CUDA
 idw_cuda = cuda.jit(nb.float64(nb.float64[:], nb.float64[:], nb.float64[:],
                                nb.float64[:],
                                nb.float64, nb.float64, nb.float64,
@@ -86,6 +87,7 @@ idw_jit = jit([nb.float64(nb.float64[:], nb.float64[:], nb.float64[:],
 
 
 def nearest_kernel(p1, p2, p3, point, v1, v2, v3):
+    """CPU/GPU shared kernel for nearest neighbor 2D interpolation"""
     distance_p1 = sqrt((p1[0]-point[0])**2 + (p1[1]-point[1])**2)
     distance_p2 = sqrt((p2[0]-point[0])**2 + (p2[1]-point[1])**2)
     distance_p3 = sqrt((p3[0]-point[0])**2 + (p3[1]-point[1])**2)
@@ -99,6 +101,7 @@ def nearest_kernel(p1, p2, p3, point, v1, v2, v3):
     else:
         return v3
 
+# Compiles nearest neighbor kernel for CPU and CUDA
 nearest_cuda = cuda.jit(nb.float64(nb.float64[:], nb.float64[:], nb.float64[:],
                                    nb.float64[:],
                                    nb.float64, nb.float64, nb.float64),
