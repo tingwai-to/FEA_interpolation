@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from time import time
-from test_data import *
+from feainterp.example_data import *
 import os
 import sys
 

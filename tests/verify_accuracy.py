@@ -1,8 +1,8 @@
 import numpy as np
 import numpy.linalg as npla
 import numba as nb
-from node import Node2D
-from element import Elem2D
+from feainterp.node import Node2D
+from feainterp.element import Elem2D
 import matplotlib.pyplot as plt
 
 
