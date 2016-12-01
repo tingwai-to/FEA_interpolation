@@ -1,6 +1,6 @@
-from node import Node
-from element import Element
-import element
+from feainterp.node import Node
+from feainterp.element import Element
+import feainterp.element as element
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
