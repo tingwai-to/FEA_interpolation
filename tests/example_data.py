@@ -1,6 +1,5 @@
-from node import Node
-from element import Element
-import element
+from feainterp.node import Node as Node
+from feainterp.element import Element as Element
 import numpy as np
 import numpy.linalg as npla
 import numba as nb

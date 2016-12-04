@@ -10,7 +10,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 setup(
     name='feainterp',
 
-    version='',
+    version='0.1',
 
     description='Interpolate values at points inside of elements for finite '
                 + 'element analysis (FEA).',
@@ -19,9 +19,9 @@ setup(
     url='https://github.com/tingwai-to/FEA_interpolation',
 
     author='Ting-Wai To',
-    author_email='',
+    author_email='tingwai.to [at] Gmail',
 
-    license='',
+    license='BSD License',
 
     classifiers=[
         'Development Status :: 3 - Alpha',
@@ -42,14 +42,4 @@ setup(
         'scipy',
         'numba',
     ],
-
-    package_data={
-        'examples': ['test_data.py'],
-    },
-
-    # entry_points={
-    #     'console_scripts': [
-    #         'feainterp=jit_setup',
-    #     ],
-    # },
 )

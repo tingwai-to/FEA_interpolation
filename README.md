@@ -2,12 +2,6 @@
 
 Interpolate values at points inside of elements for finite element analysis (FEA). Supports linear, inverse distance weighting, and nearest neighbor interpolation.
 
-##Prerequisites
-* numpy
-* scipy
-* numba
-* CUDA
-
 ##Features
 Standard (Non-JIT): Supports interpolating in n-dimensional elements (2D, 3D, etc.)
 CPU: Just-in-time (JIT) optimized functions, supported in 2D and 3D
@@ -17,8 +11,8 @@ GPU: CUDA optimized functions, supported in 2D
 ###2D Element Example
 Setup:
 ```
-from node import Node
-from element import Element
+from feainterp.node import Node as Node
+from feainterp.element import Element as Element
 
 # Coordinates of points and respective values
 p1 = np.array([2, 2], dtype='f8')
@@ -48,4 +42,13 @@ result = triangle.sample('linear', points)             # standard non-jit
 result = triangle.sample('linear', points, jit='cpu')  # CPU JIT
 result = triangle.sample('linear', points, jit='gpu')  # GPU JIT
 ```
-This linearly interpolates values at `points` inside `triangle` using non-jit, CPU, or GPU. Replace `'linear'` with `'idw'` for inverse distance weighting or `'nearest'` for nearest neighbor interpolation.
+This linearly interpolates values at `points` inside `triangle` using non-jit, CPU, or GPU. Replace `'linear'` with `'idw'` or `'nearest'` for inverse distance weighting and nearest neighbor interpolation respectively.
+
+##Prerequisites
+* numpy
+* scipy
+* numba
+* CUDA
+
+##Thank you
+I want to thank Matthew Turk and the [Data Exploration Lab](https://dxl.ncsa.illinois.edu/people/) team at the National Center for Supercomputing Applications [(NCSA)](http://www.ncsa.illinois.edu/) for their continued support and help.
