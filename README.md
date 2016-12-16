@@ -51,4 +51,4 @@ This linearly interpolates values at `points` inside `triangle` using non-jit, C
 * CUDA
 
 ##Thank you
-I want to thank Matthew Turk and the [Data Exploration Lab](https://dxl.ncsa.illinois.edu/people/) team at the National Center for Supercomputing Applications [(NCSA)](http://www.ncsa.illinois.edu/) for their continued support and help.
+I want to thank Matthew Turk and the [Data Exploration Lab](https://dxl.ncsa.illinois.edu/people/) team at the National Center for Supercomputing Applications ([NCSA](http://www.ncsa.illinois.edu/)) for their continued support and help.
