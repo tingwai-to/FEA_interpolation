@@ -16,12 +16,12 @@ def linear_kernel(p1, point, v1, v2, v3, trans):
     area3 = 0.5*ref_point_y
     area1 = 0.5 - area2 - area3
 
-    if (area1/0.5) < 0 or \
-       (area1/0.5) > 1 or \
-       (area2/0.5) < 0 or \
-       (area2/0.5) > 1 or \
-       (area3/0.5) < 0 or \
-       (area3/0.5) > 1:
+    if (area1/0.5) <= 0 or \
+       (area1/0.5) >= 1 or \
+       (area2/0.5) <= 0 or \
+       (area2/0.5) >= 1 or \
+       (area3/0.5) <= 0 or \
+       (area3/0.5) >= 1:
         return -1
     else:
         return v1*(area1/0.5) + v2*(area2/0.5) + v3*(area3/0.5)
