@@ -1,14 +1,14 @@
-#FEA Interpolation
+# FEA Interpolation
 
 Interpolate values at points inside of elements for finite element analysis (FEA). Supports linear, inverse distance weighting, and nearest neighbor interpolation.
 
-##Features
+## Features
 Standard (Non-JIT): Supports interpolating in n-dimensional elements (2D, 3D, etc.)
 CPU: Just-in-time (JIT) optimized functions, supported in 2D and 3D
 GPU: CUDA optimized functions, supported in 2D
 
-##Usage
-###2D Element Example
+## Usage
+### 2D Element Example
 Setup:
 ```
 from feainterp.node import Node as Node
@@ -44,11 +44,11 @@ result = triangle.sample('linear', points, jit='gpu')  # GPU JIT
 ```
 This linearly interpolates values at `points` inside `triangle` using non-jit, CPU, or GPU. Replace `'linear'` with `'idw'` or `'nearest'` for inverse distance weighting and nearest neighbor interpolation respectively.
 
-##Prerequisites
+## Prerequisites
 * numpy
 * scipy
 * numba
 * CUDA
 
-##Thank you
-I want to thank Matthew Turk and the [Data Exploration Lab](https://dxl.ncsa.illinois.edu/people/) team at the National Center for Supercomputing Applications [(NCSA)](http://www.ncsa.illinois.edu/) for their continued support and help.
+## Thank you
+I want to thank Matthew Turk and the [Data Exploration Lab](https://dxl.ncsa.illinois.edu/people/) team at the National Center for Supercomputing Applications ([NCSA](http://www.ncsa.illinois.edu/)) for their continued support and help.
